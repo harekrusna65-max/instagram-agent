@@ -12,6 +12,7 @@ from services.media_creator import MediaCreator
 from services.ai_generator import AIGenerator
 from services.post_service import PostService
 from services.audio_service import AudioService
+from database.db import get_fresh_quote, mark_quote_as_used
 
 # Curated viral quotes library (Aesthetic Shayari, Deep Life, Love, Attitude)
 CURATED_QUOTES = [
@@ -56,11 +57,19 @@ class AutoContentPipeline:
         caption: Optional[str] = None
     ) -> Dict[str, Any]:
         """Generate an aesthetic image post and upload it to Instagram."""
+        quote_id = None
         if not quote:
-            selected = random.choice(CURATED_QUOTES)
-            quote = selected["quote"]
-            category = category or selected["category"]
-            caption = caption or selected["caption"]
+            fresh = get_fresh_quote(category)
+            if fresh:
+                quote = fresh["quote"]
+                category = category or fresh["category"]
+                caption = caption or fresh["caption"]
+                quote_id = fresh.get("id")
+            else:
+                selected = random.choice(CURATED_QUOTES)
+                quote = selected["quote"]
+                category = category or selected["category"]
+                caption = caption or selected["caption"]
         else:
             category = category or "AESTHETIC POST"
             if not caption:
@@ -73,6 +82,12 @@ class AutoContentPipeline:
 
         print("[*] Uploading image post to Instagram...")
         res = self.post_service.publish_now(str(img_path), "photo", caption)
+        
+        # Mark quote as used so it never repeats
+        if quote_id:
+            mark_quote_as_used(quote_id)
+            print(f"[✓] Quote #{quote_id} marked as used in database (Anti-duplicate).")
+
         print(f"[✓] Successfully published image post! URL: {res.get('url')}")
         return res
 
@@ -88,11 +103,19 @@ class AutoContentPipeline:
         Generate an animated vertical video reel with soulful aesthetic music.
         By default uses pure atmospheric aesthetic BGM (No robotic AI voice) for maximum virality.
         """
+        quote_id = None
         if not hook or not quote:
-            selected = random.choice(CURATED_QUOTES)
-            hook = hook or selected["hook"]
-            quote = quote or selected["quote"]
-            caption = caption or selected["caption"]
+            fresh = get_fresh_quote()
+            if fresh:
+                hook = hook or fresh["hook"]
+                quote = quote or fresh["quote"]
+                caption = caption or fresh["caption"]
+                quote_id = fresh.get("id")
+            else:
+                selected = random.choice(CURATED_QUOTES)
+                hook = hook or selected["hook"]
+                quote = quote or selected["quote"]
+                caption = caption or selected["caption"]
         elif not caption:
             gen = self.ai.generate_caption(f"{hook} {quote[:30]}", tone="viral aesthetic reel")
             caption = gen["caption"]
@@ -132,5 +155,11 @@ class AutoContentPipeline:
 
         print("[*] Step 3: Uploading Reel to Instagram...")
         res = self.post_service.publish_now(str(final_reel_path), "reel", caption)
+
+        # Mark quote as used so it never repeats
+        if quote_id:
+            mark_quote_as_used(quote_id)
+            print(f"[✓] Quote #{quote_id} marked as used in database (Anti-duplicate).")
+
         print(f"[✓] Successfully published Reel! URL: {res.get('url')}")
         return res
