@@ -230,9 +230,15 @@ def auto_generate_and_publish_reel(pipeline: AutoContentPipeline):
         hook = Prompt.ask("[cyan]Enter Reel Hook (e.g. 'Ye baat yaad rakhna...')[/cyan]")
         quote = Prompt.ask("[cyan]Enter Main Quote / Line[/cyan]")
     
+    console.print("\n[bold cyan]Audio Selection:[/bold cyan]")
+    console.print("  [1] 🎵 [bold green]Pure Aesthetic Music / Lofi (Recommended - No Robot Voice)[/bold green]")
+    console.print("  [2] 🎙️ AI Voiceover + Background Music")
+    audio_choice = Prompt.ask("[yellow]Choose Audio Mode[/yellow]", choices=["1", "2"], default="1")
+    use_vo = (audio_choice == "2")
+
     with console.status("[bold green]Rendering vertical animated reel video and uploading...[/bold green]"):
         try:
-            res = pipeline.create_and_post_reel(hook=hook, quote=quote, duration_sec=6)
+            res = pipeline.create_and_post_reel(hook=hook, quote=quote, duration_sec=10, use_voiceover=use_vo)
             console.print(f"\n[bold green]✓ Reel Successfully Published Live![/bold green]")
             console.print(f"[bold cyan]URL:[/bold cyan] {res.get('url')}\n")
         except Exception as e:

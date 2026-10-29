@@ -196,3 +196,55 @@ class AudioService:
             shutil.copy(thumb_old, thumb_new)
 
         return output_video
+
+    def attach_music_only_to_video(
+        self,
+        video_path: Path,
+        duration_sec: float
+    ) -> Path:
+        """
+        Attaches pure aesthetic background music (without robotic voiceover).
+        Prioritizes user's custom songs in assets/music/.
+        """
+        custom_tracks = list(MUSIC_DIR.glob("*.mp3")) + list(MUSIC_DIR.glob("*.wav"))
+        if custom_tracks:
+            bg_music = random.choice(custom_tracks)
+            print(f"[✓] Using aesthetic BGM: {bg_music.name}")
+        else:
+            bg_music = AUDIO_DIR / "ambient_vibe.wav"
+            synthesize_soulful_piano_bgm(bg_music, duration_sec=duration_sec + 2.0)
+            print(f"[✓] Using synthesized aesthetic chord progression")
+
+        output_video = video_path.with_name(f"{video_path.stem}_music.mp4")
+
+        # Smooth fade-out in last 2 seconds
+        filter_str = f"[1:a]volume=0.9,afade=t=out:st={max(1.0, duration_sec - 2.0)}:d=2.0[aout]"
+
+        cmd = [
+            FFMPEG_EXE,
+            "-y",
+            "-i", str(video_path),
+            "-i", str(bg_music),
+            "-filter_complex", filter_str,
+            "-map", "0:v:0",
+            "-map", "[aout]",
+            "-c:v", "copy",
+            "-c:a", "aac",
+            "-b:a", "192k",
+            "-t", str(duration_sec),
+            str(output_video)
+        ]
+
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if res.returncode != 0:
+            print(f"[!] FFmpeg error: {res.stderr.decode('utf-8', errors='ignore')}")
+            return video_path
+
+        # Copy thumbnail
+        thumb_old = video_path.with_suffix(".jpg")
+        thumb_new = output_video.with_suffix(".jpg")
+        if thumb_old.exists():
+            import shutil
+            shutil.copy(thumb_old, thumb_new)
+
+        return output_video

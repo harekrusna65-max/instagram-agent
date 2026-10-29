@@ -81,9 +81,13 @@ class AutoContentPipeline:
         hook: Optional[str] = None,
         quote: Optional[str] = None,
         caption: Optional[str] = None,
-        duration_sec: Optional[int] = None
+        duration_sec: int = 10,
+        use_voiceover: bool = False
     ) -> Dict[str, Any]:
-        """Generate an animated vertical video reel with soulful voiceover & piano BGM, and upload to Instagram."""
+        """
+        Generate an animated vertical video reel with soulful aesthetic music.
+        By default uses pure atmospheric aesthetic BGM (No robotic AI voice) for maximum virality.
+        """
         if not hook or not quote:
             selected = random.choice(CURATED_QUOTES)
             hook = hook or selected["hook"]
@@ -93,34 +97,40 @@ class AutoContentPipeline:
             gen = self.ai.generate_caption(f"{hook} {quote[:30]}", tone="viral aesthetic reel")
             caption = gen["caption"]
 
-        print(f"[*] Step 1: Generating emotional poetic voiceover for Shayari...")
-        timestamp = int(random.random() * 100000)
-        voice_path, voice_dur = self.audio_service.generate_poetic_voiceover(
-            hook=hook,
-            quote=quote,
-            filename=f"voice_{timestamp}.mp3"
-        )
-        print(f"[✓] Voiceover generated! Exact speech length: {voice_dur:.1f}s")
+        total_duration = float(duration_sec)
 
-        # Dynamic video duration to fit 100% of the shayari + breathing room
-        total_duration = max(8.0, voice_dur + 1.8)
-        print(f"[*] Step 2: Rendering video reel to match audio ({total_duration:.1f}s)...")
+        # Step 1: Render Video
+        print(f"[*] Step 1: Rendering vertical aesthetic video reel ({total_duration}s)...")
         raw_reel_path = self.creator.create_aesthetic_reel(
             hook=hook,
             quote=quote,
-            duration_sec=int(math.ceil(total_duration))
+            duration_sec=int(total_duration)
         )
         print(f"[✓] Reel video rendered: {raw_reel_path}")
 
-        print("[*] Step 3: Mixing voiceover with soulful acoustic piano BGM & cinematic reverb...")
-        final_reel_path = self.audio_service.attach_audio_to_video(
-            video_path=raw_reel_path,
-            voice_mp3=voice_path,
-            total_duration=total_duration
-        )
+        # Step 2: Attach Pure Aesthetic BGM (or Voiceover if explicitly enabled)
+        if use_voiceover:
+            print("[*] Step 2: Generating voiceover and mixing with BGM...")
+            voice_path, voice_dur = self.audio_service.generate_poetic_voiceover(
+                hook=hook,
+                quote=quote,
+                filename="voice_custom.mp3"
+            )
+            final_reel_path = self.audio_service.attach_audio_to_video(
+                video_path=raw_reel_path,
+                voice_mp3=voice_path,
+                total_duration=total_duration
+            )
+        else:
+            print("[*] Step 2: Attaching pure soulful aesthetic BGM (No robot voice)...")
+            final_reel_path = self.audio_service.attach_music_only_to_video(
+                video_path=raw_reel_path,
+                duration_sec=total_duration
+            )
+
         print(f"[✓] Reel audio successfully mixed: {final_reel_path}")
 
-        print("[*] Step 4: Uploading complete soulful Reel to Instagram...")
+        print("[*] Step 3: Uploading Reel to Instagram...")
         res = self.post_service.publish_now(str(final_reel_path), "reel", caption)
         print(f"[✓] Successfully published Reel! URL: {res.get('url')}")
         return res
