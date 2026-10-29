@@ -15,6 +15,15 @@ from typing import Optional, Dict, Any, List
 from instagrapi import Client
 from instagrapi.types import UserShort, Media
 
+# Monkey-patch moviepy.VideoFileClip if moviepy is installed
+try:
+    import moviepy
+    import moviepy.editor
+    if not hasattr(moviepy, "VideoFileClip"):
+        moviepy.VideoFileClip = moviepy.editor.VideoFileClip
+except Exception:
+    pass
+
 # Ensure UTF-8 console output on Windows
 if sys.platform.startswith("win"):
     try:

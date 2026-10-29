@@ -3,6 +3,7 @@ Post & Reel Publishing and Scheduling Service
 """
 
 from typing import Dict, Any, Optional
+from pathlib import Path
 from core.client import InstagramAgentClient
 from database.db import (
     add_scheduled_post,
@@ -21,7 +22,10 @@ class PostService:
         if media_type == "photo":
             media = self.client.post_photo(media_path, caption)
         elif media_type == "reel":
-            media = self.client.post_reel(media_path, caption)
+            video_p = Path(media_path)
+            thumb_p = video_p.with_suffix(".jpg")
+            thumb_str = str(thumb_p) if thumb_p.exists() else None
+            media = self.client.post_reel(media_path, caption, thumbnail_path=thumb_str)
         else:
             raise ValueError(f"Unsupported media type: {media_type}. Must be 'photo' or 'reel'.")
 

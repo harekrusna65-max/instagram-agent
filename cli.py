@@ -26,6 +26,7 @@ from services.ai_generator import AIGenerator
 from services.post_service import PostService
 from services.engagement_service import EngagementService
 from services.analytics_service import AnalyticsService
+from services.auto_content_pipeline import AutoContentPipeline
 
 def print_banner():
     console.print(Panel(
@@ -205,6 +206,38 @@ def manage_rules():
         add_keyword_rule(kw, c_reply, dm_reply)
         console.print(f"[bold green]✓ Rule for '{kw}' added successfully![/bold green]")
 
+def auto_generate_and_publish_post(pipeline: AutoContentPipeline):
+    console.print("\n[bold yellow]🎨 Auto-Create & Publish Aesthetic Post[/bold yellow]")
+    custom = Confirm.ask("[cyan]Do you want to enter a custom quote/topic?[/cyan]", default=False)
+    quote = None
+    if custom:
+        quote = Prompt.ask("[cyan]Enter Quote / Shayari[/cyan]")
+    
+    with console.status("[bold green]Creating aesthetic artwork and publishing to Instagram...[/bold green]"):
+        try:
+            res = pipeline.create_and_post_image(quote=quote)
+            console.print(f"\n[bold green]✓ Post Successfully Published Live![/bold green]")
+            console.print(f"[bold cyan]URL:[/bold cyan] {res.get('url')}\n")
+        except Exception as e:
+            console.print(f"[bold red]Failed to post:[/bold red] {e}")
+
+def auto_generate_and_publish_reel(pipeline: AutoContentPipeline):
+    console.print("\n[bold yellow]🎬 Auto-Create & Publish Aesthetic Reel[/bold yellow]")
+    custom = Confirm.ask("[cyan]Do you want to enter a custom Hook & Quote?[/cyan]", default=False)
+    hook = None
+    quote = None
+    if custom:
+        hook = Prompt.ask("[cyan]Enter Reel Hook (e.g. 'Ye baat yaad rakhna...')[/cyan]")
+        quote = Prompt.ask("[cyan]Enter Main Quote / Line[/cyan]")
+    
+    with console.status("[bold green]Rendering vertical animated reel video and uploading...[/bold green]"):
+        try:
+            res = pipeline.create_and_post_reel(hook=hook, quote=quote, duration_sec=6)
+            console.print(f"\n[bold green]✓ Reel Successfully Published Live![/bold green]")
+            console.print(f"[bold cyan]URL:[/bold cyan] {res.get('url')}\n")
+        except Exception as e:
+            console.print(f"[bold red]Failed to post reel:[/bold red] {e}")
+
 def main():
     init_db()
     print_banner()
@@ -220,19 +253,22 @@ def main():
     post_service = PostService(client)
     engagement = EngagementService(client, ai)
     analytics = AnalyticsService(client)
+    pipeline = AutoContentPipeline(client)
 
     while True:
         console.print("\n[bold cyan]Main Menu:[/bold cyan]")
         console.print("  [bold white][1][/bold white] 📊 View Account Profile & Live Analytics")
-        console.print("  [bold white][2][/bold white] 📸 Upload Post (Photo / Reel) Now")
+        console.print("  [bold white][2][/bold white] 📸 Upload Post (Photo / Reel) Now (Manual File)")
         console.print("  [bold white][3][/bold white] ⏰ Schedule a Post for Later")
         console.print("  [bold white][4][/bold white] 🤖 Run Auto-Engagement Bot (Auto-DM & Comment Responder)")
         console.print("  [bold white][5][/bold white] ✨ AI Caption & Hashtag Generator")
         console.print("  [bold white][6][/bold white] 💬 View Direct Message Inbox")
         console.print("  [bold white][7][/bold white] ⚙️ Keyword Auto-Reply Rules")
+        console.print("  [bold yellow][8][/bold yellow] 🎨 [bold green]Auto-Create & Publish Aesthetic Post NOW[/bold green]")
+        console.print("  [bold yellow][9][/bold yellow] 🎬 [bold green]Auto-Create & Publish Aesthetic Reel NOW[/bold green]")
         console.print("  [bold white][0][/bold white] 🚪 Exit\n")
 
-        choice = Prompt.ask("[bold yellow]Choose an option[/bold yellow]", choices=["0", "1", "2", "3", "4", "5", "6", "7"], default="1")
+        choice = Prompt.ask("[bold yellow]Choose an option[/bold yellow]", choices=["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"], default="1")
 
         if choice == "1":
             view_profile_and_stats(analytics)
@@ -248,6 +284,10 @@ def main():
             view_dms(client)
         elif choice == "7":
             manage_rules()
+        elif choice == "8":
+            auto_generate_and_publish_post(pipeline)
+        elif choice == "9":
+            auto_generate_and_publish_reel(pipeline)
         elif choice == "0":
             console.print("[bold green]Goodbye! 👋[/bold green]")
             break

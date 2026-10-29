@@ -18,3 +18,6 @@ instagrapi_session.json
 cacert_win.pem
 *.db
 *.sqlite3
+
+# Generated media
+generated/
