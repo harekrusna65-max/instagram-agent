@@ -1,0 +1,12 @@
+[project]
+name = "instagram-agent"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "instagrapi>=3.2.2",
+    "playwright>=1.64.1",
+    "python-dotenv>=1.2.4",
+    "rich>=15.0.0",
+]
