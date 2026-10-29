@@ -75,7 +75,19 @@ class InstagramAgentClient:
         time.sleep(random.uniform(min_sec, max_sec))
 
     def authenticate(self) -> bool:
-        """Authenticate using stored session."""
+        """Authenticate using stored session or environment variable."""
+        # Restore session from environment variable if on cloud (Render / Docker)
+        import base64
+        env_b64 = os.getenv("IG_SESSION_B64")
+        if env_b64 and not SESSION_FILE.exists():
+            try:
+                decoded = base64.b64decode(env_b64)
+                with open(SESSION_FILE, "wb") as f:
+                    f.write(decoded)
+                print("[✓] Restored session from IG_SESSION_B64 environment variable.")
+            except Exception as e:
+                print(f"[!] Failed to decode IG_SESSION_B64: {e}")
+
         if SESSION_FILE.exists():
             try:
                 self.cl.load_settings(str(SESSION_FILE))

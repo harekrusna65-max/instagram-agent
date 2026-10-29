@@ -21,3 +21,5 @@ cacert_win.pem
 
 # Generated media
 generated/
+
+RENDER_SESSION_ENV.txt
