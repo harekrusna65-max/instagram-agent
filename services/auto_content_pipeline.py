@@ -81,7 +81,7 @@ class AutoContentPipeline:
         hook: Optional[str] = None,
         quote: Optional[str] = None,
         caption: Optional[str] = None,
-        duration_sec: int = 10,
+        duration_sec: int = 12,
         use_voiceover: bool = False
     ) -> Dict[str, Any]:
         """

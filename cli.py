@@ -238,7 +238,7 @@ def auto_generate_and_publish_reel(pipeline: AutoContentPipeline):
 
     with console.status("[bold green]Rendering vertical animated reel video and uploading...[/bold green]"):
         try:
-            res = pipeline.create_and_post_reel(hook=hook, quote=quote, duration_sec=10, use_voiceover=use_vo)
+            res = pipeline.create_and_post_reel(hook=hook, quote=quote, duration_sec=12, use_voiceover=use_vo)
             console.print(f"\n[bold green]✓ Reel Successfully Published Live![/bold green]")
             console.print(f"[bold cyan]URL:[/bold cyan] {res.get('url')}\n")
         except Exception as e:
