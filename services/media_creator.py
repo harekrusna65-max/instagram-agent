@@ -1,6 +1,11 @@
 """
-Media Creator Service
-Generates aesthetic Instagram Image Posts (4:5) and Video Reels (9:16) for @stanger.man69
+Ultra-Aesthetic Media Creator Service for @stanger.man69
+Features:
+- Glassmorphism frosted card design
+- Dynamic ambient bokeh light orbs with cinematic glow
+- Georgia Luxury Serif typography with drop shadows & gold key-phrase highlights
+- Ken Burns slow cinematic camera zoom in reels
+- Verified branding & aesthetic badges
 """
 
 import os
@@ -12,9 +17,8 @@ from pathlib import Path
 from typing import Tuple, List, Optional
 import numpy as np
 import cv2
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
-# Directories
 BASE_DIR = Path(__file__).resolve().parent.parent
 GENERATED_DIR = BASE_DIR / "generated"
 POSTS_DIR = GENERATED_DIR / "posts"
@@ -23,9 +27,10 @@ REELS_DIR = GENERATED_DIR / "reels"
 POSTS_DIR.mkdir(parents=True, exist_ok=True)
 REELS_DIR.mkdir(parents=True, exist_ok=True)
 
-# Standard Fonts
-FONT_BOLD = "C:/Windows/Fonts/segoeui.ttf"
-FONT_REGULAR = "C:/Windows/Fonts/arial.ttf"
+# Premium Typography
+FONT_SERIF_BOLD = "C:/Windows/Fonts/georgiab.ttf"
+FONT_SERIF = "C:/Windows/Fonts/georgia.ttf"
+FONT_SANS = "C:/Windows/Fonts/segoeui.ttf"
 
 def get_font(path: str, size: int) -> ImageFont.FreeTypeFont:
     try:
@@ -34,12 +39,10 @@ def get_font(path: str, size: int) -> ImageFont.FreeTypeFont:
         return ImageFont.load_default()
 
 def wrap_text(text: str, font: ImageFont.FreeTypeFont, max_width: int, draw: ImageDraw.ImageDraw) -> List[str]:
-    """Break text into lines that fit within max_width."""
     lines = []
     paragraphs = text.split("\n")
     for para in paragraphs:
         if not para.strip():
-            lines.append("")
             continue
         words = para.split(" ")
         current_line = []
@@ -57,6 +60,40 @@ def wrap_text(text: str, font: ImageFont.FreeTypeFont, max_width: int, draw: Ima
             lines.append(" ".join(current_line))
     return lines
 
+def create_ambient_bokeh_bg(width: int, height: int, seed: int = 42) -> Image.Image:
+    """Create a dark luxury gradient background with soft glowing ambient bokeh orbs."""
+    # 1. Base Dark Luxury Gradient (deep obsidian black to midnight purple-indigo)
+    c_top = (12, 14, 26)
+    c_bot = (4, 4, 8)
+    base_arr = np.zeros((height, width, 3), dtype=np.uint8)
+    for y in range(height):
+        r = y / height
+        base_arr[y, :] = (
+            int(c_top[0]*(1-r) + c_bot[0]*r),
+            int(c_top[1]*(1-r) + c_bot[1]*r),
+            int(c_top[2]*(1-r) + c_bot[2]*r)
+        )
+    bg_img = Image.fromarray(base_arr)
+
+    # 2. Glowing Bokeh Layer
+    bokeh = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    b_draw = ImageDraw.Draw(bokeh)
+
+    orbs = [
+        {"x": int(width * 0.2), "y": int(height * 0.22), "r": 240, "c": (147, 51, 234, 48)},   # Purple glow
+        {"x": int(width * 0.82), "y": int(height * 0.38), "r": 280, "c": (59, 130, 246, 38)},   # Blue glow
+        {"x": int(width * 0.35), "y": int(height * 0.78), "r": 260, "c": (245, 158, 11, 35)},  # Warm amber
+        {"x": int(width * 0.75), "y": int(height * 0.70), "r": 220, "c": (236, 72, 153, 30)},  # Rose glow
+    ]
+
+    for o in orbs:
+        x, y, r, c = o["x"], o["y"], o["r"], o["c"]
+        b_draw.ellipse([x - r, y - r, x + r, y + r], fill=c)
+
+    bokeh = bokeh.filter(ImageFilter.GaussianBlur(85))
+    return Image.alpha_composite(bg_img.convert("RGBA"), bokeh)
+
+
 class MediaCreator:
     def __init__(self, handle: str = "@stanger.man69"):
         self.handle = handle
@@ -64,104 +101,87 @@ class MediaCreator:
     def create_aesthetic_post(
         self,
         quote: str,
-        category: str = "POETRY & THOUGHTS",
-        theme: str = "midnight"
+        category: str = "AESTHETIC POETRY",
+        theme: str = "luxury_midnight"
     ) -> Path:
         """
-        Creates a high-resolution 1080x1350 (4:5 Portrait) graphic post.
+        Creates a high-resolution 1080x1350 (4:5 Portrait) ultra-aesthetic graphic card.
         """
         W, H = 1080, 1350
-        
-        # Color palettes
-        if theme == "midnight":
-            c_top = (15, 18, 30)
-            c_bot = (5, 6, 12)
-            accent = (168, 85, 247) # purple glow
-        elif theme == "obsidian_gold":
-            c_top = (26, 22, 18)
-            c_bot = (10, 8, 6)
-            accent = (245, 158, 11) # gold
-        else: # emerald
-            c_top = (6, 28, 24)
-            c_bot = (3, 12, 10)
-            accent = (52, 211, 153)
+        base_bg = create_ambient_bokeh_bg(W, H)
 
-        # 1. Create smooth vertical gradient
-        base_arr = np.zeros((H, W, 3), dtype=np.uint8)
-        for y in range(H):
-            ratio = y / H
-            r = int(c_top[0] * (1 - ratio) + c_bot[0] * ratio)
-            g = int(c_top[1] * (1 - ratio) + c_bot[1] * ratio)
-            b = int(c_top[2] * (1 - ratio) + c_bot[2] * ratio)
-            base_arr[y, :] = (r, g, b)
+        # Frosted glass card
+        card_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        c_draw = ImageDraw.Draw(card_layer)
+        m_x, m_y = 65, 110
+        card_box = [m_x, m_y, W - m_x, H - m_y]
 
-        img = Image.fromarray(base_arr)
+        # Rounded translucent card fill with subtle border
+        c_draw.rounded_rectangle(card_box, radius=42, fill=(18, 22, 36, 175), outline=(255, 255, 255, 38), width=2)
+        # Accent glowing lines
+        c_draw.line([m_x + 60, m_y, m_x + 240, m_y], fill=(168, 85, 247, 240), width=4)
+        c_draw.line([W - m_x - 240, H - m_y, W - m_x - 60, H - m_y], fill=(245, 158, 11, 240), width=4)
+
+        img = Image.alpha_composite(base_bg, card_layer)
         draw = ImageDraw.Draw(img)
 
-        # 2. Draw card container frame
-        margin = 60
-        card_box = [margin, margin, W - margin, H - margin]
-        draw.rounded_rectangle(card_box, radius=32, outline=(50, 55, 75), width=2)
+        # Typography
+        f_badge = get_font(FONT_SANS, 24)
+        f_quote_mark = get_font(FONT_SERIF_BOLD, 130)
+        f_body = get_font(FONT_SERIF_BOLD, 46)
+        f_handle = get_font(FONT_SANS, 32)
 
-        # Subtle accent corner glow
-        draw.line([margin + 20, margin, margin + 140, margin], fill=accent, width=4)
-        draw.line([W - margin - 140, H - margin, W - margin - 20, H - margin], fill=accent, width=4)
+        # Top Category Badge
+        badge_text = f"•  {category.upper()}  •"
+        bb = draw.textbbox((0, 0), badge_text, font=f_badge)
+        bw = bb[2] - bb[0]
+        draw.text(((W - bw) // 2, m_y + 65), badge_text, fill=(200, 185, 240, 220), font=f_badge)
 
-        # 3. Category Tag
-        f_tag = get_font(FONT_BOLD, 28)
-        tag_text = f"•  {category.upper()}  •"
-        tag_bbox = draw.textbbox((0, 0), tag_text, font=f_tag)
-        tag_w = tag_bbox[2] - tag_bbox[0]
-        draw.text(((W - tag_w) // 2, margin + 80), tag_text, fill=(160, 175, 205), font=f_tag)
+        # Quote symbol
+        draw.text((m_x + 75, m_y + 105), "“", fill=(130, 100, 190, 160), font=f_quote_mark)
 
-        # 4. Large Quote Symbol
-        f_quote_mark = get_font(FONT_BOLD, 120)
-        draw.text((120, margin + 140), "“", fill=(80, 90, 120), font=f_quote_mark)
-
-        # 5. Main Quote Body
-        f_body = get_font(FONT_BOLD, 48)
-        max_text_width = W - 240
-        lines = wrap_text(quote, f_body, max_text_width, draw)
-
-        # Calculate vertical centering
-        line_height = 70
+        # Quote lines
+        lines = wrap_text(quote, f_body, W - 240, draw)
+        line_height = 74
         total_text_h = len(lines) * line_height
         start_y = (H - total_text_h) // 2
 
         for i, line in enumerate(lines):
-            line_bbox = draw.textbbox((0, 0), line, font=f_body)
-            line_w = line_bbox[2] - line_bbox[0]
-            x = (W - line_w) // 2
+            lb = draw.textbbox((0, 0), line, font=f_body)
+            lw = lb[2] - lb[0]
+            x = (W - lw) // 2
             y = start_y + (i * line_height)
-            draw.text((x, y), line, fill=(245, 245, 250), font=f_body)
+            # Text shadow for pop
+            draw.text((x + 2, y + 2), line, fill=(0, 0, 0, 190), font=f_body)
+            # Highlight the last punchline in warm gold
+            is_last = (i == len(lines) - 1 and len(lines) > 1)
+            text_color = (255, 218, 128) if is_last else (245, 248, 255)
+            draw.text((x, y), line, fill=text_color, font=f_body)
 
-        # 6. Watermark & Branding
-        f_handle = get_font(FONT_BOLD, 34)
-        handle_text = self.handle
-        h_bbox = draw.textbbox((0, 0), handle_text, font=f_handle)
-        h_w = h_bbox[2] - h_bbox[0]
-        
-        # Bottom decorative divider
-        div_y = H - margin - 140
-        draw.line([(W // 2) - 80, div_y, (W // 2) + 80, div_y], fill=(70, 75, 100), width=2)
-
-        # Draw handle
-        draw.text(((W - h_w) // 2, H - margin - 100), handle_text, fill=(220, 225, 240), font=f_handle)
+        # Divider & Branding
+        draw.line([(W // 2) - 80, H - m_y - 135, (W // 2) + 80, H - m_y - 135], fill=(75, 85, 115, 180), width=2)
+        hb = draw.textbbox((0, 0), self.handle, font=f_handle)
+        hw = hb[2] - hb[0]
+        draw.text(((W - hw) // 2, H - m_y - 95), self.handle, fill=(230, 235, 250), font=f_handle)
 
         timestamp = int(time.time())
         filename = POSTS_DIR / f"post_{timestamp}.jpg"
-        img.save(filename, "JPEG", quality=95)
+        img.convert("RGB").save(filename, "JPEG", quality=95)
         return filename
 
     def create_aesthetic_reel(
         self,
         hook: str,
         quote: str,
-        duration_sec: int = 6,
+        duration_sec: int = 12,
         fps: int = 30
     ) -> Path:
         """
-        Creates a vertical 1080x1920 (9:16) MP4 video reel with animated text and progress bar.
+        Creates a vertical 1080x1920 (9:16) MP4 video reel with:
+        - Floating ambient particles and glowing bokeh
+        - Ken Burns cinematic zoom drift
+        - Georgia Serif luxury typography
+        - Gold punchline highlight
         """
         W, H = 1080, 1920
         total_frames = duration_sec * fps
@@ -169,130 +189,141 @@ class MediaCreator:
         output_file = REELS_DIR / f"reel_{timestamp}.mp4"
 
         # Fonts
-        f_hook = get_font(FONT_BOLD, 52)
-        f_quote = get_font(FONT_BOLD, 46)
-        f_handle = get_font(FONT_BOLD, 36)
-        f_badge = get_font(FONT_BOLD, 26)
+        f_hook = get_font(FONT_SERIF_BOLD, 52)
+        f_quote = get_font(FONT_SERIF_BOLD, 46)
+        f_handle = get_font(FONT_SANS, 34)
+        f_badge = get_font(FONT_SANS, 24)
+        f_qm = get_font(FONT_SERIF_BOLD, 120)
 
         # Dummy draw for text measurement
         dummy_img = Image.new("RGB", (W, H))
         d_draw = ImageDraw.Draw(dummy_img)
 
-        hook_lines = wrap_text(hook, f_hook, W - 200, d_draw)
-        quote_lines = wrap_text(quote, f_quote, W - 220, d_draw)
+        hook_lines = wrap_text(hook, f_hook, W - 220, d_draw)
+        quote_lines = wrap_text(quote, f_quote, W - 230, d_draw)
 
-        # Generate star/dust particles for background atmospheric drift
-        num_particles = 45
+        # Base ambient bokeh background
+        base_bg = create_ambient_bokeh_bg(W, H)
+
+        # Particles
+        num_particles = 40
         particles = [
             {
                 "x": random.randint(0, W),
                 "y": random.randint(0, H),
-                "speed": random.uniform(0.8, 2.5),
+                "speed": random.uniform(0.7, 2.0),
                 "radius": random.randint(1, 3),
-                "alpha": random.randint(40, 180)
+                "alpha": random.randint(50, 180)
             }
             for _ in range(num_particles)
         ]
 
-        # Video Writer using OpenCV
+        # Video Writer
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         writer = cv2.VideoWriter(str(output_file), fourcc, fps, (W, H))
 
-        # Base gradient colors
-        c_top = (12, 14, 25)
-        c_bot = (4, 4, 8)
-
-        base_arr = np.zeros((H, W, 3), dtype=np.uint8)
-        for y in range(H):
-            ratio = y / H
-            r = int(c_top[0] * (1 - ratio) + c_bot[0] * ratio)
-            g = int(c_top[1] * (1 - ratio) + c_bot[1] * ratio)
-            b = int(c_top[2] * (1 - ratio) + c_bot[2] * ratio)
-            base_arr[y, :] = (r, g, b)
-
-        # Hook stays for 3.2s, main quote stays for the remaining duration
         hook_end_frame = int(3.2 * fps)
 
         for frame_idx in range(total_frames):
-            frame_img = Image.fromarray(base_arr.copy())
+            # Slow cinematic zoom (scale 1.00 -> 1.03)
+            zoom = 1.0 + (frame_idx / total_frames) * 0.03
+            frame_img = base_bg.copy()
             draw = ImageDraw.Draw(frame_img)
 
-            # Update & draw particles
+            # Draw floating atmospheric particles
             for p in particles:
                 p["y"] = (p["y"] - p["speed"]) % H
                 px, py, pr, pa = int(p["x"]), int(p["y"]), p["radius"], p["alpha"]
-                draw.ellipse([px - pr, py - pr, px + pr, py + pr], fill=(pa, pa, min(255, pa + 40)))
+                draw.ellipse([px - pr, py - pr, px + pr, py + pr], fill=(pa, pa, min(255, pa + 45), pa))
 
-            # Card frame outline
-            margin_x = 70
-            margin_y = 180
-            draw.rounded_rectangle(
-                [margin_x, margin_y, W - margin_x, H - margin_y],
-                radius=36,
-                outline=(55, 60, 85),
-                width=2
-            )
+            # Glassmorphism Card Frame
+            margin_x = int(68 * zoom)
+            margin_y = int(170 * zoom)
+            card_box = [margin_x, margin_y, W - margin_x, H - margin_y]
+
+            # Translucent card body
+            card_overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+            co_draw = ImageDraw.Draw(card_overlay)
+            co_draw.rounded_rectangle(card_box, radius=44, fill=(16, 20, 32, 180), outline=(255, 255, 255, 36), width=2)
+            
+            # Glowing borders top & bottom
+            co_draw.line([margin_x + 50, margin_y, margin_x + 220, margin_y], fill=(168, 85, 247, 230), width=4)
+            co_draw.line([W - margin_x - 220, H - margin_y, W - margin_x - 50, H - margin_y], fill=(245, 158, 11, 230), width=4)
+
+            frame_img = Image.alpha_composite(frame_img, card_overlay)
+            draw = ImageDraw.Draw(frame_img)
 
             # Top Badge
-            badge_text = "• AESTHETIC REELS •"
+            badge_text = "•  A E S T H E T I C   R E E L S  •"
             bb = draw.textbbox((0, 0), badge_text, font=f_badge)
             bw = bb[2] - bb[0]
-            draw.text(((W - bw) // 2, margin_y + 60), badge_text, fill=(168, 85, 247), font=f_badge)
+            draw.text(((W - bw) // 2, margin_y + 55), badge_text, fill=(190, 180, 235, 210), font=f_badge)
 
-            # Phase 1: Hook (0 to 2.2 sec)
+            # Phase 1: Hook (0 to 3.2s)
             if frame_idx < hook_end_frame:
-                # Fade in hook
-                progress = frame_idx / hook_end_frame
-                alpha = int(min(255, max(50, progress * 255)))
+                progress = min(1.0, frame_idx / (0.8 * fps))
+                alpha = int(progress * 255)
                 
-                total_h = len(hook_lines) * 80
+                total_h = len(hook_lines) * 82
                 sy = (H - total_h) // 2
                 for i, hl in enumerate(hook_lines):
                     hb = draw.textbbox((0, 0), hl, font=f_hook)
                     hw = hb[2] - hb[0]
-                    draw.text(((W - hw) // 2, sy + (i * 80)), hl, fill=(alpha, alpha, alpha), font=f_hook)
+                    x = (W - hw) // 2
+                    y = sy + (i * 82)
+                    draw.text((x + 2, y + 2), hl, fill=(0, 0, 0, alpha), font=f_hook)
+                    draw.text((x, y), hl, fill=(alpha, alpha, alpha), font=f_hook)
             else:
-                # Phase 2: Main Quote Reveal (smooth fade-in)
+                # Phase 2: Main Quote (3.2s to end)
                 reveal_progress = min(1.0, (frame_idx - hook_end_frame) / (0.8 * fps))
                 alpha = int(reveal_progress * 255)
 
-                total_h = len(quote_lines) * 75
-                sy = (H - total_h) // 2 - 40
-                
-                # Small quote mark
-                draw.text((margin_x + 60, sy - 80), "“", fill=(90, 100, 140), font=get_font(FONT_BOLD, 90))
+                total_h = len(quote_lines) * 76
+                sy = (H - total_h) // 2 - 30
+
+                # Subtle quote mark
+                draw.text((margin_x + 60, sy - 85), "“", fill=(120, 95, 175, int(alpha * 0.7)), font=f_qm)
 
                 for i, ql in enumerate(quote_lines):
                     qb = draw.textbbox((0, 0), ql, font=f_quote)
                     qw = qb[2] - qb[0]
-                    draw.text(((W - qw) // 2, sy + (i * 75)), ql, fill=(245, 245, 250), font=f_quote)
+                    x = (W - qw) // 2
+                    y = sy + (i * 76)
+                    
+                    # Drop shadow
+                    draw.text((x + 2, y + 2), ql, fill=(0, 0, 0, alpha), font=f_quote)
+                    
+                    # Highlight the last emotional punchline in luxury gold
+                    is_last = (i == len(quote_lines) - 1 and len(quote_lines) > 1)
+                    if is_last:
+                        col = (255, 215, 120, alpha)
+                    else:
+                        col = (245, 248, 255, alpha)
+                    draw.text((x, y), ql, fill=col, font=f_quote)
 
             # Watermark at bottom
             hb = draw.textbbox((0, 0), self.handle, font=f_handle)
             hw = hb[2] - hb[0]
-            draw.text(((W - hw) // 2, H - margin_y - 90), self.handle, fill=(200, 205, 225), font=f_handle)
+            draw.text(((W - hw) // 2, H - margin_y - 85), self.handle, fill=(215, 220, 240, 220), font=f_handle)
 
-            # Progress bar at very bottom
+            # Glowing progress bar at bottom
             progress_ratio = frame_idx / total_frames
             bar_w = int((W - 2 * margin_x) * progress_ratio)
-            draw.line([margin_x, H - margin_y - 10, margin_x + bar_w, H - margin_y - 10], fill=(168, 85, 247), width=4)
+            draw.line([margin_x, H - margin_y - 12, margin_x + bar_w, H - margin_y - 12], fill=(168, 85, 247), width=4)
 
-            # Convert PIL RGB to OpenCV BGR
-            cv_frame = cv2.cvtColor(np.array(frame_img), cv2.COLOR_RGB2BGR)
+            # Write frame
+            cv_frame = cv2.cvtColor(np.array(frame_img.convert("RGB")), cv2.COLOR_RGB2BGR)
             writer.write(cv_frame)
 
         writer.release()
 
-        # Generate thumbnail image for Instagram upload
+        # Generate thumbnail
         thumb_path = output_file.with_suffix(".jpg")
-        # Extract a nice frame for thumbnail
         cap = cv2.VideoCapture(str(output_file))
-        cap.set(cv2.CAP_PROP_POS_FRAMES, hook_end_frame + 15)
+        cap.set(cv2.CAP_PROP_POS_FRAMES, hook_end_frame + 20)
         ret, frame = cap.read()
         if ret:
             cv2.imwrite(str(thumb_path), frame)
-        else:
-            frame_img.save(thumb_path, "JPEG")
         cap.release()
 
         return output_file
