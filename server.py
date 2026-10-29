@@ -14,8 +14,8 @@ import threading
 import schedule
 from datetime import datetime
 from pathlib import Path
-from fastapi import FastAPI, BackgroundTasks
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, BackgroundTasks, Request
+from fastapi.responses import JSONResponse, HTMLResponse
 
 # Force UTF-8 on Windows
 if sys.platform.startswith("win"):
@@ -23,6 +23,9 @@ if sys.platform.startswith("win"):
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:
         pass
+
+BASE_DIR = Path(__file__).resolve().parent
+TEMPLATES_DIR = BASE_DIR / "templates"
 
 from database.db import init_db
 from core.client import InstagramAgentClient
@@ -95,9 +98,24 @@ def startup_event():
     t = threading.Thread(target=bg_scheduler_loop, daemon=True)
     t.start()
 
-@app.get("/")
-def home():
-    """UptimeRobot ping endpoint to keep Render awake 24/7."""
+@app.get("/", response_class=HTMLResponse)
+@app.get("/admin", response_class=HTMLResponse)
+def admin_panel(request: Request):
+    """
+    Renders the modern Glassmorphism Cloud Admin Panel for @stanger.man69.
+    Also returns 200 OK for UptimeRobot keep-alive pings.
+    """
+    admin_html_file = TEMPLATES_DIR / "admin.html"
+    if admin_html_file.exists():
+        with open(admin_html_file, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    
+    # Fallback minimal HTML
+    return HTMLResponse("<h1>Instagram AI Studio Online</h1><p>Status: Active</p>")
+
+@app.get("/api/status")
+def api_status():
+    """API endpoint returning raw system status JSON."""
     return {
         "status": "online",
         "service": "Instagram AI Agent",
