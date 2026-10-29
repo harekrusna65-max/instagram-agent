@@ -4,6 +4,7 @@ Generates aesthetic media (Post / Reel), crafts viral captions, and uploads dire
 """
 
 import random
+import math
 from pathlib import Path
 from typing import Dict, Any, Optional
 from core.client import InstagramAgentClient
@@ -80,9 +81,9 @@ class AutoContentPipeline:
         hook: Optional[str] = None,
         quote: Optional[str] = None,
         caption: Optional[str] = None,
-        duration_sec: int = 5
+        duration_sec: Optional[int] = None
     ) -> Dict[str, Any]:
-        """Generate an animated vertical video reel and upload it to Instagram Reels."""
+        """Generate an animated vertical video reel with soulful voiceover & piano BGM, and upload to Instagram."""
         if not hook or not quote:
             selected = random.choice(CURATED_QUOTES)
             hook = hook or selected["hook"]
@@ -92,20 +93,34 @@ class AutoContentPipeline:
             gen = self.ai.generate_caption(f"{hook} {quote[:30]}", tone="viral aesthetic reel")
             caption = gen["caption"]
 
-        print(f"[*] Rendering vertical reel video (Hook: '{hook}')")
-        raw_reel_path = self.creator.create_aesthetic_reel(hook=hook, quote=quote, duration_sec=duration_sec)
+        print(f"[*] Step 1: Generating emotional poetic voiceover for Shayari...")
+        timestamp = int(random.random() * 100000)
+        voice_path, voice_dur = self.audio_service.generate_poetic_voiceover(
+            hook=hook,
+            quote=quote,
+            filename=f"voice_{timestamp}.mp3"
+        )
+        print(f"[✓] Voiceover generated! Exact speech length: {voice_dur:.1f}s")
+
+        # Dynamic video duration to fit 100% of the shayari + breathing room
+        total_duration = max(8.0, voice_dur + 1.8)
+        print(f"[*] Step 2: Rendering video reel to match audio ({total_duration:.1f}s)...")
+        raw_reel_path = self.creator.create_aesthetic_reel(
+            hook=hook,
+            quote=quote,
+            duration_sec=int(math.ceil(total_duration))
+        )
         print(f"[✓] Reel video rendered: {raw_reel_path}")
 
-        print("[*] Generating emotional voiceover and ambient audio soundscape...")
-        speech_text = f"{hook} ... {quote.replace(chr(10), ' ')}"
+        print("[*] Step 3: Mixing voiceover with soulful acoustic piano BGM & cinematic reverb...")
         final_reel_path = self.audio_service.attach_audio_to_video(
             video_path=raw_reel_path,
-            speech_text=speech_text,
-            duration_sec=duration_sec
+            voice_mp3=voice_path,
+            total_duration=total_duration
         )
-        print(f"[✓] Reel audio mixed and attached: {final_reel_path}")
+        print(f"[✓] Reel audio successfully mixed: {final_reel_path}")
 
-        print("[*] Uploading Reel with Audio to Instagram...")
+        print("[*] Step 4: Uploading complete soulful Reel to Instagram...")
         res = self.post_service.publish_now(str(final_reel_path), "reel", caption)
-        print(f"[✓] Successfully published Reel with Audio! URL: {res.get('url')}")
+        print(f"[✓] Successfully published Reel! URL: {res.get('url')}")
         return res

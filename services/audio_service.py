@@ -1,7 +1,10 @@
 """
-Audio Service for Instagram Reels
-Generates natural emotional Hindi/English voiceover and ambient aesthetic soundscapes,
-and combines them into the Reel video using ffmpeg.
+Audio Service for Soulful Instagram Reels
+Features:
+- Authentic emotional poetry voiceover (Urdu/Hindi lehza with soulful pacing and dramatic pauses)
+- Dynamic duration calculation so 100% of the shayari is spoken without getting cut off
+- Rich acoustic piano / lofi music generator + support for custom BGM in assets/music/
+- Cinematic reverb and audio mixing via FFmpeg
 """
 
 import os
@@ -9,10 +12,11 @@ import sys
 import math
 import wave
 import struct
+import random
 import asyncio
 import subprocess
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 import imageio_ffmpeg
 import truststore
 
@@ -22,120 +26,169 @@ import edge_tts
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 AUDIO_DIR = BASE_DIR / "generated" / "audio"
+MUSIC_DIR = BASE_DIR / "assets" / "music"
+
 AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+MUSIC_DIR.mkdir(parents=True, exist_ok=True)
 
 FFMPEG_EXE = imageio_ffmpeg.get_ffmpeg_exe()
 
 
-def generate_ambient_pad_wav(output_wav: Path, duration_sec: float = 6.0, sample_rate: int = 44100):
+def get_media_duration(file_path: Path) -> float:
+    """Extract exact media duration in seconds using ffmpeg."""
+    cmd = [FFMPEG_EXE, "-i", str(file_path)]
+    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    for line in res.stderr.splitlines():
+        if "Duration:" in line:
+            try:
+                raw = line.split("Duration:")[1].split(",")[0].strip()
+                h, m, s = raw.split(":")
+                return float(h) * 3600 + float(m) * 60 + float(s)
+            except Exception:
+                pass
+    return 10.0
+
+
+def synthesize_soulful_piano_bgm(output_wav: Path, duration_sec: float, sample_rate: int = 44100):
     """
-    Synthesize a warm, calming 432Hz ambient chord pad (Lofi / Cinema vibe).
+    Synthesize an emotional, melancholy acoustic piano chord progression (Am - F - C - G).
     """
     num_samples = int(sample_rate * duration_sec)
-    # Frequencies: A minor 9th ambient chord (A2, C3, E3, G3, B3)
-    notes = [110.0, 130.81, 164.81, 196.00, 246.94]
-    
-    with wave.open(str(output_wav), "w") as wav_file:
-        wav_file.setnchannels(2)  # Stereo
-        wav_file.setsampwidth(2)  # 16-bit
-        wav_file.setframerate(sample_rate)
-        
-        frames = bytearray()
-        for i in range(num_samples):
-            t = i / sample_rate
-            # Envelope: fade-in 0.8s, fade-out 1.2s
-            fade_in = min(1.0, t / 0.8)
-            fade_out = min(1.0, (duration_sec - t) / 1.2)
-            env = fade_in * fade_out
-            
-            # Combine subtle sine waves with warm detuning
-            val = 0.0
-            for freq in notes:
-                # Add gentle detune / shimmer
-                val += math.sin(2 * math.pi * freq * t) * 0.18
-                val += math.sin(2 * math.pi * (freq * 1.002) * t) * 0.12
-            
-            sample_val = int(val * env * 24000)
-            sample_val = max(-32767, min(32767, sample_val))
-            
-            # Stereo left & right
-            frames.extend(struct.pack("<hh", sample_val, sample_val))
-            
-        wav_file.writeframes(frames)
+    chords = [
+        [220.0, 261.63, 329.63, 440.0],  # Am (A3, C4, E4, A4)
+        [174.61, 220.0, 261.63, 349.23], # F  (F3, A3, C4, F4)
+        [130.81, 164.81, 196.0, 261.63], # C  (C3, E3, G3, C4)
+        [196.0, 246.94, 293.66, 392.0],  # G  (G3, B3, D4, G4)
+    ]
+    chord_dur = 4.0
+    samples = [0.0] * num_samples
+
+    total_chords_needed = int(math.ceil(duration_sec / chord_dur)) + 1
+    for i in range(total_chords_needed):
+        chord = chords[i % len(chords)]
+        start_t = i * chord_dur
+        for n_idx, freq in enumerate(chord):
+            note_start = start_t + (n_idx * 0.32)
+            start_idx = int(note_start * sample_rate)
+            if start_idx >= num_samples:
+                break
+            end_idx = min(num_samples, start_idx + int(5.5 * sample_rate))
+            for s_idx in range(start_idx, end_idx):
+                t_note = (s_idx - start_idx) / sample_rate
+                # Exponential decay for piano key
+                decay = math.exp(-t_note * 1.3)
+                # Harmonic spectrum for rich piano timbre
+                val = (
+                    math.sin(2 * math.pi * freq * t_note) * 0.65 +
+                    math.sin(4 * math.pi * freq * t_note) * 0.22 +
+                    math.sin(6 * math.pi * freq * t_note) * 0.10 +
+                    math.sin(8 * math.pi * freq * t_note) * 0.04
+                ) * decay * 0.16
+                samples[s_idx] += val
+
+    max_v = max(abs(s) for s in samples) or 1.0
+    with wave.open(str(output_wav), "w") as f:
+        f.setnchannels(2)
+        f.setsampwidth(2)
+        f.setframerate(sample_rate)
+        raw = bytearray()
+        for s in samples:
+            norm = int((s / max_v) * 26000)
+            norm = max(-32767, min(32767, norm))
+            raw.extend(struct.pack("<hh", norm, norm))
+        f.writeframes(raw)
 
 
 class AudioService:
-    def __init__(self, voice: str = "hi-IN-MadhurNeural"):
+    def __init__(self, voice: str = "ur-PK-AsadNeural"):
+        # ur-PK-AsadNeural provides authentic poetic Shayari lehza; fallback: hi-IN-MadhurNeural
         self.voice = voice
 
     async def _create_voiceover_async(self, text: str, output_path: Path):
-        communicate = edge_tts.Communicate(text, self.voice, rate="-5%", pitch="-2Hz")
+        # Format text with pauses for soulful poetic delivery
+        # Rate -15% slows down speech for deep emotional impact
+        communicate = edge_tts.Communicate(
+            text,
+            self.voice,
+            rate="-16%",
+            pitch="-3Hz"
+        )
         await communicate.save(str(output_path))
 
-    def generate_voiceover(self, text: str, filename: str = "voiceover.mp3") -> Path:
-        """Generate high-quality emotional spoken voiceover."""
+    def generate_poetic_voiceover(self, hook: str, quote: str, filename: str) -> Tuple[Path, float]:
+        """
+        Creates a soul-touching poetic voiceover with dramatic pauses.
+        Returns: (voice_file_path, duration_seconds)
+        """
         out_path = AUDIO_DIR / filename
-        asyncio.run(self._create_voiceover_async(text, out_path))
-        return out_path
+        
+        # Punctuate and add natural breathing pauses
+        poetic_text = f"{hook.strip(' .')}...\n\n{quote.strip()}\n\n..."
+        
+        try:
+            asyncio.run(self._create_voiceover_async(poetic_text, out_path))
+        except Exception as e:
+            print(f"[!] Primary voice failed ({e}), switching to hi-IN-MadhurNeural...")
+            self.voice = "hi-IN-MadhurNeural"
+            asyncio.run(self._create_voiceover_async(poetic_text, out_path))
+
+        duration = get_media_duration(out_path)
+        return out_path, duration
 
     def attach_audio_to_video(
         self,
         video_path: Path,
-        speech_text: Optional[str] = None,
-        duration_sec: float = 6.0
+        voice_mp3: Path,
+        total_duration: float
     ) -> Path:
         """
-        Mixes ambient music and speech voiceover, then attaches to the MP4 video.
-        Outputs an Instagram-ready MP4 with AAC audio track.
+        Mixes emotional voiceover + soulful piano background music (or custom BGM from assets/music/)
+        with cinematic reverb, and attaches to video.
         """
-        temp_bg = AUDIO_DIR / "ambient_bg.wav"
-        generate_ambient_pad_wav(temp_bg, duration_sec=duration_sec)
-
-        output_video = video_path.with_name(f"{video_path.stem}_audio.mp4")
-
-        if speech_text:
-            voice_mp3 = self.generate_voiceover(speech_text, f"{video_path.stem}_voice.mp3")
-            
-            # Merge background ambient pad + voiceover + video using ffmpeg
-            # Voice is full volume (1.0), ambient pad is subtle background (0.22)
-            cmd = [
-                FFMPEG_EXE,
-                "-y",
-                "-i", str(video_path),
-                "-i", str(voice_mp3),
-                "-i", str(temp_bg),
-                "-filter_complex",
-                "[1:a]volume=1.2[a1];[2:a]volume=0.22[a2];[a1][a2]amix=inputs=2:duration=first[aout]",
-                "-map", "0:v:0",
-                "-map", "[aout]",
-                "-c:v", "copy",
-                "-c:a", "aac",
-                "-b:a", "192k",
-                "-shortest",
-                str(output_video)
-            ]
+        # 1. Check for custom music in assets/music/
+        custom_tracks = list(MUSIC_DIR.glob("*.mp3")) + list(MUSIC_DIR.glob("*.wav"))
+        if custom_tracks:
+            bg_music = random.choice(custom_tracks)
+            print(f"[✓] Using custom BGM track from assets/music/: {bg_music.name}")
         else:
-            # Only ambient background music
-            cmd = [
-                FFMPEG_EXE,
-                "-y",
-                "-i", str(video_path),
-                "-i", str(temp_bg),
-                "-map", "0:v:0",
-                "-map", "1:a:0",
-                "-c:v", "copy",
-                "-c:a", "aac",
-                "-b:a", "192k",
-                "-shortest",
-                str(output_video)
-            ]
+            bg_music = AUDIO_DIR / f"{video_path.stem}_piano.wav"
+            synthesize_soulful_piano_bgm(bg_music, duration_sec=total_duration + 2.0)
+            print(f"[✓] Generated soulful acoustic piano BGM progression")
+
+        output_video = video_path.with_name(f"{video_path.stem}_soulful.mp4")
+
+        # FFmpeg filter:
+        # [0:a] voiceover: slight delay 0.4s, high quality volume 1.3
+        # [1:a] bgm: subtle volume 0.18 with soft fade-out
+        # aecho adds cinematic acoustic space
+        filter_str = (
+            "[1:a]volume=1.35,adelay=400|400[voice];"
+            "[2:a]volume=0.20,afade=t=out:st={st}:d=2.0,aecho=0.8:0.7:50:0.3[music];"
+            "[voice][music]amix=inputs=2:duration=first[aout]"
+        ).format(st=max(1.0, total_duration - 2.0))
+
+        cmd = [
+            FFMPEG_EXE,
+            "-y",
+            "-i", str(video_path),
+            "-i", str(voice_mp3),
+            "-i", str(bg_music),
+            "-filter_complex", filter_str,
+            "-map", "0:v:0",
+            "-map", "[aout]",
+            "-c:v", "copy",
+            "-c:a", "aac",
+            "-b:a", "192k",
+            "-t", str(total_duration),
+            str(output_video)
+        ]
 
         res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if res.returncode != 0:
-            print(f"[!] FFmpeg audio attach error: {res.stderr.decode('utf-8', errors='ignore')}")
+            print(f"[!] FFmpeg error: {res.stderr.decode('utf-8', errors='ignore')}")
             return video_path
 
-        # Also create/update thumbnail for the new video
+        # Copy thumbnail
         thumb_old = video_path.with_suffix(".jpg")
         thumb_new = output_video.with_suffix(".jpg")
         if thumb_old.exists():

@@ -210,7 +210,7 @@ class MediaCreator:
             b = int(c_top[2] * (1 - ratio) + c_bot[2] * ratio)
             base_arr[y, :] = (r, g, b)
 
-        hook_end_frame = int(2.2 * fps)
+        hook_end_frame = int(min(3.8, (total_frames / fps) * 0.28) * fps)
 
         for frame_idx in range(total_frames):
             frame_img = Image.fromarray(base_arr.copy())
