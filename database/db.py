@@ -247,6 +247,33 @@ def seed_content_vault():
         conn.commit()
 
 
+def get_unused_quote_count() -> int:
+    """Returns number of unused quotes currently in vault."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) as cnt FROM content_vault WHERE is_used = 0")
+        return cursor.fetchone()["cnt"]
+
+
+def replenish_vault_with_quotes(quotes: List[Dict[str, str]]) -> int:
+    """Inserts freshly generated AI quotes into vault."""
+    added = 0
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        for item in quotes:
+            try:
+                cursor.execute("""
+                    INSERT OR IGNORE INTO content_vault (category, hook, quote, caption, is_used)
+                    VALUES (?, ?, ?, ?, 0)
+                """, (item["category"], item["hook"], item["quote"], item["caption"]))
+                if cursor.rowcount > 0:
+                    added += 1
+            except Exception:
+                pass
+        conn.commit()
+    return added
+
+
 def get_fresh_quote(category: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """
     Fetches an UNUSED quote from the vault.

@@ -113,6 +113,8 @@ def admin_panel(request: Request):
     # Fallback minimal HTML
     return HTMLResponse("<h1>Instagram AI Studio Online</h1><p>Status: Active</p>")
 
+from database.db import get_unused_quote_count
+
 @app.get("/api/status")
 def api_status():
     """API endpoint returning raw system status JSON."""
@@ -120,6 +122,8 @@ def api_status():
         "status": "online",
         "service": "Instagram AI Agent",
         "account": f"@{client.username}" if client and client.username else "Authenticating...",
+        "vault_quotes_ready": get_unused_quote_count(),
+        "hashtag_engine": "Smart Anti-Shadowban Rotator Active",
         "uptimerobot_keep_alive": "active",
         "scheduler": "running" if scheduler_running else "idle",
         "server_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")

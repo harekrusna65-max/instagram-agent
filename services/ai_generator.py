@@ -100,3 +100,68 @@ class AIGenerator:
             f"Sent you a DM with more details @{commenter_name}! Check inbox 📩"
         ]
         return random.choice(templates)
+
+    def generate_fresh_vault_quotes(self, count: int = 5) -> List[Dict[str, str]]:
+        """
+        Autonomously generates fresh, viral-grade Shayari & Quotes to keep the Content Vault infinitely full.
+        """
+        import json
+        if self.has_gemini:
+            prompt = f"""
+            You are a master Urdu/Hindi poet and Instagram aesthetic quote writer.
+            Create {count} unique, heart-touching, aesthetic 2-to-4 line Shayari / Deep Quotes.
+            Topics: Khamoshi, Self-Respect, Waqt, Rishte, Sukoon, Maturity, Solitude.
+            Format output strictly as a JSON array of objects with keys:
+            - "category": e.g. "AESTHETIC SHAYARI", "DEEP LIFE", "SELF RESPECT", "KHAMOSHI"
+            - "hook": catchy first line (e.g. "Ye baat hamesha yaad rakhna...")
+            - "quote": 2-4 lines of poetic text separated by newline
+            - "caption_line": 1-2 sentence emotional caption
+            Only return valid JSON array, no markdown fences.
+            """
+            try:
+                resp = self.model.generate_content(prompt)
+                raw_text = resp.text.strip().replace("```json", "").replace("```", "").strip()
+                data = json.loads(raw_text)
+                if isinstance(data, list):
+                    return [
+                        {
+                            "category": item.get("category", "DEEP LIFE"),
+                            "hook": item.get("hook", "Ye baat hamesha yaad rakhna..."),
+                            "quote": item.get("quote", ""),
+                            "caption": item.get("caption_line", "Sukoon khamoshi me hai ✨")
+                        }
+                        for item in data if item.get("quote")
+                    ]
+            except Exception as e:
+                print(f"[!] AI Quote generation error: {e}. Using generative templates.")
+
+        # High-variety generative poetic builder
+        categories = ["AESTHETIC SHAYARI", "DEEP LIFE", "SELF RESPECT", "KHAMOSHI & SUKOON", "MATURITY", "PEOPLE & REALITY"]
+        hooks = [
+            "Ye baat dil me utar jaayegi...",
+            "Waqt sabko ek sabak sikhata hai...",
+            "Khamoshi ka bhi ek mayaar hota hai...",
+            "Apni keemat samajhna seekho...",
+            "Zindagi ka sabse gehra sach...",
+            "Logon ki fitrat samajh aane lage toh..."
+        ]
+
+        poetic_templates = [
+            ("Umar thodi aur beet jaane do,\nKayi chehron se naqab utarenge,\nAur tab tumhe khamoshi ki keemat samajh aayegi.", "AESTHETIC SHAYARI", "Waqt sab bata deta hai ✨⏳"),
+            ("Jahan kadar na ho wahan se nikal jaana hi behtar hai,\nChahe wo kisi ka ghar ho, mehfil ho,\nYa kisi ka dil.", "SELF RESPECT", "Apni izzat sabse pehle 💯🔥"),
+            ("Zindagi me kuch dard aise hote hain,\nJo lafzon me bayan nahi hote,\nBas aankhon ki nami me thehar jaate hain.", "KHAMOSHI & SUKOON", "Kuch dard bas mehsoos hote hain 🥀💔"),
+            ("Mushkil waqt ka ek sabse bada fayda hai,\nYe bata deta hai ki kaun apna hai,\nAur kaun bas waqt guzar raha tha.", "DEEP LIFE", "Asal chehre waqt dikhata hai 📌💡"),
+            ("Har baat par shikayat karna chhod do,\nKyunki sukoon unhe milta hai\nJo har haal me shukr ada karna jaante hain.", "MATURITY", "Shukr me hi sukoon hai 🤍✨"),
+            ("Akele chalne ka hausla rakho,\nBheed hamesha hausla cheen leti hai,\nLekin pehchan akele rehkar hi banti hai.", "PEOPLE & REALITY", "Apni pehchan khud banao ⚡🚀")
+        ]
+
+        results = []
+        sampled = random.sample(poetic_templates, min(count, len(poetic_templates)))
+        for q, cat, cap in sampled:
+            results.append({
+                "category": cat,
+                "hook": random.choice(hooks),
+                "quote": q,
+                "caption": cap
+            })
+        return results

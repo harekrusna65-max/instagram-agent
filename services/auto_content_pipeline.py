@@ -12,7 +12,13 @@ from services.media_creator import MediaCreator
 from services.ai_generator import AIGenerator
 from services.post_service import PostService
 from services.audio_service import AudioService
-from database.db import get_fresh_quote, mark_quote_as_used
+from services.hashtag_service import HashtagRotator
+from database.db import (
+    get_fresh_quote,
+    mark_quote_as_used,
+    get_unused_quote_count,
+    replenish_vault_with_quotes
+)
 
 # Curated viral quotes library (Aesthetic Shayari, Deep Life, Love, Attitude)
 CURATED_QUOTES = [
@@ -49,6 +55,19 @@ class AutoContentPipeline:
         self.ai = AIGenerator()
         self.post_service = PostService(client)
         self.audio_service = AudioService()
+        self.hashtags = HashtagRotator()
+
+    def _ensure_vault_replenished(self):
+        """Auto-generate fresh AI quotes if content vault is getting low."""
+        try:
+            cnt = get_unused_quote_count()
+            if cnt < 4:
+                print(f"[*] Content Vault running low ({cnt} left). Autonomously generating 6 fresh AI quotes...")
+                fresh_batch = self.ai.generate_fresh_vault_quotes(count=6)
+                added = replenish_vault_with_quotes(fresh_batch)
+                print(f"[✓] Added {added} fresh quotes to Content Vault! Total unused now: {get_unused_quote_count()}")
+        except Exception as e:
+            print(f"[!] Vault replenishment notice: {e}")
 
     def create_and_post_image(
         self,
@@ -57,24 +76,29 @@ class AutoContentPipeline:
         caption: Optional[str] = None
     ) -> Dict[str, Any]:
         """Generate an aesthetic image post and upload it to Instagram."""
+        self._ensure_vault_replenished()
         quote_id = None
         if not quote:
             fresh = get_fresh_quote(category)
             if fresh:
                 quote = fresh["quote"]
                 category = category or fresh["category"]
-                caption = caption or fresh["caption"]
+                caption_base = fresh["caption"].split("#")[0].strip()
+                smart_tags = self.hashtags.get_smart_hashtags(category=category)
+                caption = caption or f"{caption_base}\n\n{smart_tags}"
                 quote_id = fresh.get("id")
             else:
                 selected = random.choice(CURATED_QUOTES)
                 quote = selected["quote"]
                 category = category or selected["category"]
-                caption = caption or selected["caption"]
+                smart_tags = self.hashtags.get_smart_hashtags(category=category)
+                caption = caption or f"{selected['caption'].split('#')[0].strip()}\n\n{smart_tags}"
         else:
             category = category or "AESTHETIC POST"
             if not caption:
                 gen = self.ai.generate_caption(quote[:40], tone="poetic and aesthetic")
-                caption = gen["caption"]
+                smart_tags = self.hashtags.get_smart_hashtags(category=category)
+                caption = f"{gen['caption'].split('#')[0].strip()}\n\n{smart_tags}"
 
         print(f"[*] Designing aesthetic post for: '{quote[:30]}...'")
         img_path = self.creator.create_aesthetic_post(quote=quote, category=category)
@@ -103,22 +127,28 @@ class AutoContentPipeline:
         Generate an animated vertical video reel with soulful aesthetic music.
         By default uses pure atmospheric aesthetic BGM (No robotic AI voice) for maximum virality.
         """
+        self._ensure_vault_replenished()
         quote_id = None
         if not hook or not quote:
             fresh = get_fresh_quote()
             if fresh:
                 hook = hook or fresh["hook"]
                 quote = quote or fresh["quote"]
-                caption = caption or fresh["caption"]
+                category = fresh.get("category", "AESTHETIC REELS")
+                caption_base = fresh["caption"].split("#")[0].strip()
+                smart_tags = self.hashtags.get_smart_hashtags(category=category)
+                caption = caption or f"{caption_base}\n\n{smart_tags}"
                 quote_id = fresh.get("id")
             else:
                 selected = random.choice(CURATED_QUOTES)
                 hook = hook or selected["hook"]
                 quote = quote or selected["quote"]
-                caption = caption or selected["caption"]
+                smart_tags = self.hashtags.get_smart_hashtags(category=selected["category"])
+                caption = caption or f"{selected['caption'].split('#')[0].strip()}\n\n{smart_tags}"
         elif not caption:
             gen = self.ai.generate_caption(f"{hook} {quote[:30]}", tone="viral aesthetic reel")
-            caption = gen["caption"]
+            smart_tags = self.hashtags.get_smart_hashtags(category="VIRAL_REELS")
+            caption = f"{gen['caption'].split('#')[0].strip()}\n\n{smart_tags}"
 
         total_duration = float(duration_sec)
 
