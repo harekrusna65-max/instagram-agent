@@ -10,6 +10,7 @@ from core.client import InstagramAgentClient
 from services.media_creator import MediaCreator
 from services.ai_generator import AIGenerator
 from services.post_service import PostService
+from services.audio_service import AudioService
 
 # Curated viral quotes library (Aesthetic Shayari, Deep Life, Love, Attitude)
 CURATED_QUOTES = [
@@ -45,6 +46,7 @@ class AutoContentPipeline:
         self.creator = MediaCreator(handle=f"@{client.username or 'stanger.man69'}")
         self.ai = AIGenerator()
         self.post_service = PostService(client)
+        self.audio_service = AudioService()
 
     def create_and_post_image(
         self,
@@ -91,10 +93,19 @@ class AutoContentPipeline:
             caption = gen["caption"]
 
         print(f"[*] Rendering vertical reel video (Hook: '{hook}')")
-        reel_path = self.creator.create_aesthetic_reel(hook=hook, quote=quote, duration_sec=duration_sec)
-        print(f"[✓] Reel video rendered: {reel_path}")
+        raw_reel_path = self.creator.create_aesthetic_reel(hook=hook, quote=quote, duration_sec=duration_sec)
+        print(f"[✓] Reel video rendered: {raw_reel_path}")
 
-        print("[*] Uploading Reel to Instagram...")
-        res = self.post_service.publish_now(str(reel_path), "reel", caption)
-        print(f"[✓] Successfully published Reel! URL: {res.get('url')}")
+        print("[*] Generating emotional voiceover and ambient audio soundscape...")
+        speech_text = f"{hook} ... {quote.replace(chr(10), ' ')}"
+        final_reel_path = self.audio_service.attach_audio_to_video(
+            video_path=raw_reel_path,
+            speech_text=speech_text,
+            duration_sec=duration_sec
+        )
+        print(f"[✓] Reel audio mixed and attached: {final_reel_path}")
+
+        print("[*] Uploading Reel with Audio to Instagram...")
+        res = self.post_service.publish_now(str(final_reel_path), "reel", caption)
+        print(f"[✓] Successfully published Reel with Audio! URL: {res.get('url')}")
         return res
