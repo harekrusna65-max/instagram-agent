@@ -49,17 +49,20 @@ scheduler_running = False
 
 def init_agent():
     global client, pipeline, post_service, engagement, analytics
-    if client is None:
-        client = InstagramAgentClient()
-        if client.authenticate():
-            pipeline = AutoContentPipeline(client)
-            ai = AIGenerator()
-            post_service = PostService(client)
-            engagement = EngagementService(client, ai)
-            analytics = AnalyticsService(client)
-            print(f"[✓ SERVER] Authenticated as @{client.username}")
-        else:
-            print("[!] Authentication failed on server.")
+    try:
+        if client is None:
+            client = InstagramAgentClient()
+            if client.authenticate():
+                pipeline = AutoContentPipeline(client)
+                ai = AIGenerator()
+                post_service = PostService(client)
+                engagement = EngagementService(client, ai)
+                analytics = AnalyticsService(client)
+                print(f"[✓ SERVER] Authenticated as @{client.username}")
+            else:
+                print("[!] Authentication failed on server. Waiting for IG_SESSION_B64.")
+    except Exception as e:
+        print(f"[!] Error in init_agent: {e}")
 
 def bg_scheduler_loop():
     global scheduler_running

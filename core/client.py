@@ -38,16 +38,31 @@ CA_FILE = BASE_DIR / "cacert_win.pem"
 
 
 def get_ca_bundle_path() -> str:
-    """Ensure Windows Root CA bundle exists for SSL verification."""
+    """Ensure CA bundle exists for SSL verification across Windows and Linux."""
+    # On Linux (Docker / Render), standard certifi or system CA works out of the box
+    if not sys.platform.startswith("win"):
+        ca_path = certifi.where()
+        os.environ["CURL_CA_BUNDLE"] = ca_path
+        os.environ["SSL_CERT_FILE"] = ca_path
+        os.environ["REQUESTS_CA_BUNDLE"] = ca_path
+        return ca_path
+
+    # On Windows, extract Windows Root CA store if not already present
     if not CA_FILE.exists():
-        certs = ssl.enum_certificates("ROOT") + ssl.enum_certificates("CA")
-        with open(CA_FILE, "w", encoding="utf-8") as f:
-            with open(certifi.where(), "r", encoding="utf-8") as cf:
-                f.write(cf.read())
-            f.write("\n")
-            for cert, encoding, trust in certs:
-                if encoding == "x509_asn":
-                    f.write(ssl.DER_cert_to_PEM_cert(cert) + "\n")
+        if hasattr(ssl, "enum_certificates"):
+            try:
+                certs = ssl.enum_certificates("ROOT") + ssl.enum_certificates("CA")
+                with open(CA_FILE, "w", encoding="utf-8") as f:
+                    with open(certifi.where(), "r", encoding="utf-8") as cf:
+                        f.write(cf.read())
+                    f.write("\n")
+                    for cert, encoding, trust in certs:
+                        if encoding == "x509_asn":
+                            f.write(ssl.DER_cert_to_PEM_cert(cert) + "\n")
+            except Exception:
+                return certifi.where()
+        else:
+            return certifi.where()
     
     ca_path = str(CA_FILE.resolve())
     os.environ["CURL_CA_BUNDLE"] = ca_path

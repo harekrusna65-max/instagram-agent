@@ -33,8 +33,25 @@ FONT_SERIF = "C:/Windows/Fonts/georgia.ttf"
 FONT_SANS = "C:/Windows/Fonts/segoeui.ttf"
 
 def get_font(path: str, size: int) -> ImageFont.FreeTypeFont:
+    candidates = [
+        path,
+        "C:/Windows/Fonts/georgiab.ttf",
+        "C:/Windows/Fonts/georgia.ttf",
+        "C:/Windows/Fonts/segoeui.ttf",
+        "C:/Windows/Fonts/arial.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSerif-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+    ]
+    for p in candidates:
+        if os.path.exists(p):
+            try:
+                return ImageFont.truetype(p, size)
+            except Exception:
+                pass
     try:
-        return ImageFont.truetype(path, size)
+        return ImageFont.load_default(size=size)
     except Exception:
         return ImageFont.load_default()
 

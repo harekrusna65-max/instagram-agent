@@ -12,16 +12,20 @@ import sys
 import math
 import wave
 import struct
+import shutil
 import random
 import asyncio
 import subprocess
 from pathlib import Path
 from typing import Optional, Tuple
 import imageio_ffmpeg
-import truststore
 
-# Enable Windows certificate store for edge-tts
-truststore.inject_into_ssl()
+try:
+    import truststore
+    truststore.inject_into_ssl()
+except Exception:
+    pass
+
 import edge_tts
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -31,7 +35,7 @@ MUSIC_DIR = BASE_DIR / "assets" / "music"
 AUDIO_DIR.mkdir(parents=True, exist_ok=True)
 MUSIC_DIR.mkdir(parents=True, exist_ok=True)
 
-FFMPEG_EXE = imageio_ffmpeg.get_ffmpeg_exe()
+FFMPEG_EXE = shutil.which("ffmpeg") or imageio_ffmpeg.get_ffmpeg_exe()
 
 
 def get_media_duration(file_path: Path) -> float:
