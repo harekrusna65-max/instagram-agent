@@ -103,25 +103,93 @@ def synthesize_soulful_piano_bgm(output_wav: Path, duration_sec: float, sample_r
         f.writeframes(raw)
 
 
+# Mood to track matching dictionary
+MOOD_TRACK_MAPPING = {
+    "sad_emotional": [
+        "02_heartfelt_piano_ballad.wav",
+        "03_nocturnal_solitude_strings.wav"
+    ],
+    "sukoon_midnight": [
+        "01_midnight_sukoon_lofi.wav",
+        "04_rainy_window_lofi.wav",
+        "aesthetic_lofi_vibe.wav"
+    ],
+    "attitude_mindset": [
+        "05_deep_cinematic_swell.wav",
+        "03_nocturnal_solitude_strings.wav"
+    ],
+    "love_nostalgia": [
+        "06_golden_hour_serenity.wav",
+        "01_midnight_sukoon_lofi.wav"
+    ]
+}
+
+def detect_shayari_mood(text: str = "", category: str = "") -> str:
+    """
+    Analyzes Hindi/Urdu poetry lyrics and category to classify emotional mood.
+    Returns: 'sad_emotional' | 'sukoon_midnight' | 'attitude_mindset' | 'love_nostalgia'
+    """
+    combined = f"{category} {text}".lower()
+
+    # Keyword pools
+    sad_kws = ["dard", "rona", "aansu", "dil", "toot", "judai", "zakhm", "akela", "bewafa", "chhod", "yaad", "tanhai", "gham", "rooth", "mar"]
+    sukoon_kws = ["sukoon", "khamoshi", "raat", "shaant", "neend", "midnight", "hawa", "chand", "sitare", "khwaab", "rooh", "aalam", "duniya"]
+    attitude_kws = ["waqt", "aukaat", "dushman", "sabak", "matlab", "izzat", "self respect", "shor", "sher", "udaan", "kismat", "pehchan", "badla", "kamyabi", "fitrat"]
+    love_kws = ["ishq", "mohabbat", "pyaar", "nazar", "deedar", "muskurahat", "ehsaas", "sanam", "humsafar", "baatein"]
+
+    scores = {
+        "sad_emotional": sum(1 for k in sad_kws if k in combined),
+        "sukoon_midnight": sum(1 for k in sukoon_kws if k in combined),
+        "attitude_mindset": sum(1 for k in attitude_kws if k in combined),
+        "love_nostalgia": sum(1 for k in love_kws if k in combined)
+    }
+
+    if "SAD" in category.upper() or "DARD" in category.upper():
+        scores["sad_emotional"] += 3
+    elif "KHAMOSHI" in category.upper() or "SUKOON" in category.upper():
+        scores["sukoon_midnight"] += 3
+    elif "SELF" in category.upper() or "ATTITUDE" in category.upper() or "REALITY" in category.upper():
+        scores["attitude_mindset"] += 3
+
+    best = max(scores, key=scores.get)
+    return best if scores[best] > 0 else "sukoon_midnight"
+
+
 class AudioService:
     def __init__(self, voice: str = "ur-PK-AsadNeural"):
         # ur-PK-AsadNeural provides authentic poetic Shayari lehza; fallback: hi-IN-MadhurNeural
         self.voice = voice
         self.last_used_track: Optional[Path] = None
 
-    def _get_next_bgm_track(self, fallback_path: Path, total_duration: float) -> Path:
-        """Picks a track from assets/music/ ensuring it never repeats the same track consecutively."""
+    def _get_next_bgm_track(
+        self,
+        fallback_path: Path,
+        total_duration: float,
+        text: str = "",
+        category: str = ""
+    ) -> Path:
+        """Picks a track from assets/music/ intelligently matching the emotional mood of the shayari."""
         custom_tracks = sorted(list(MUSIC_DIR.glob("*.mp3")) + list(MUSIC_DIR.glob("*.wav")))
-        if custom_tracks:
-            available = [t for t in custom_tracks if t != self.last_used_track]
-            bg_music = random.choice(available) if available else custom_tracks[0]
-            self.last_used_track = bg_music
-            print(f"[BGM] Using rotated aesthetic BGM: {bg_music.name} (from {len(custom_tracks)} tracks)")
-            return bg_music
-        else:
+        if not custom_tracks:
             synthesize_soulful_piano_bgm(fallback_path, duration_sec=total_duration + 2.0)
             print(f"[BGM] Generated soulful acoustic piano BGM progression")
             return fallback_path
+
+        # Detect shayari mood
+        mood = detect_shayari_mood(text, category)
+        target_filenames = MOOD_TRACK_MAPPING.get(mood, [])
+
+        # Filter custom tracks that match target mood filenames or keywords
+        matched_tracks = [t for t in custom_tracks if t.name in target_filenames or any(k in t.name.lower() for k in mood.split("_"))]
+        candidate_pool = matched_tracks if matched_tracks else custom_tracks
+
+        # Avoid playing same track twice consecutively
+        available = [t for t in candidate_pool if t != self.last_used_track]
+        bg_music = random.choice(available) if available else candidate_pool[0]
+        self.last_used_track = bg_music
+
+        print(f"[BGM Match] Detected Mood: '{mood.upper()}'. Selected Track: {bg_music.name}")
+        return bg_music
 
     async def _create_voiceover_async(self, text: str, output_path: Path):
         # Format text with pauses for soulful poetic delivery
@@ -158,15 +226,17 @@ class AudioService:
         self,
         video_path: Path,
         voice_mp3: Path,
-        total_duration: float
+        total_duration: float,
+        text: str = "",
+        category: str = ""
     ) -> Path:
         """
-        Mixes emotional voiceover + soulful piano background music (or custom BGM from assets/music/)
+        Mixes emotional voiceover + soulful background music intelligently matched to the emotion
         with cinematic reverb, and attaches to video.
         """
-        # 1. Get rotated BGM track
+        # 1. Get rotated BGM track matched to shayari emotion
         fallback_bgm = AUDIO_DIR / f"{video_path.stem}_piano.wav"
-        bg_music = self._get_next_bgm_track(fallback_bgm, total_duration)
+        bg_music = self._get_next_bgm_track(fallback_bgm, total_duration, text=text, category=category)
 
         output_video = video_path.with_name(f"{video_path.stem}_soulful.mp4")
 
@@ -213,14 +283,16 @@ class AudioService:
     def attach_music_only_to_video(
         self,
         video_path: Path,
-        duration_sec: float
+        duration_sec: float,
+        text: str = "",
+        category: str = ""
     ) -> Path:
         """
-        Attaches pure aesthetic background music (without robotic voiceover).
-        Prioritizes user's custom songs in assets/music/.
+        Attaches pure aesthetic background music intelligently matched to the emotion of the shayari.
+        Prioritizes mood matching across tracks in assets/music/.
         """
         fallback_bgm = AUDIO_DIR / f"{video_path.stem}_ambient.wav"
-        bg_music = self._get_next_bgm_track(fallback_bgm, duration_sec)
+        bg_music = self._get_next_bgm_track(fallback_bgm, duration_sec, text=text, category=category)
 
         output_video = video_path.with_name(f"{video_path.stem}_music.mp4")
 

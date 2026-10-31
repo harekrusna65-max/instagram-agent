@@ -161,7 +161,8 @@ class AutoContentPipeline:
         )
         print(f"[✓] Reel video rendered: {raw_reel_path}")
 
-        # Step 2: Attach Pure Aesthetic BGM (or Voiceover if explicitly enabled)
+        # Step 2: Attach Pure Aesthetic BGM matched to Shayari emotion
+        combined_text = f"{hook or ''} {quote or ''}"
         if use_voiceover:
             print("[*] Step 2: Generating voiceover and mixing with BGM...")
             voice_path, voice_dur = self.audio_service.generate_poetic_voiceover(
@@ -172,13 +173,17 @@ class AutoContentPipeline:
             final_reel_path = self.audio_service.attach_audio_to_video(
                 video_path=raw_reel_path,
                 voice_mp3=voice_path,
-                total_duration=total_duration
+                total_duration=total_duration,
+                text=combined_text,
+                category=category or ""
             )
         else:
-            print("[*] Step 2: Attaching pure soulful aesthetic BGM (No robot voice)...")
+            print("[*] Step 2: Attaching pure aesthetic BGM matched to shayari mood...")
             final_reel_path = self.audio_service.attach_music_only_to_video(
                 video_path=raw_reel_path,
-                duration_sec=total_duration
+                duration_sec=total_duration,
+                text=combined_text,
+                category=category or ""
             )
 
         print(f"[✓] Reel audio successfully mixed: {final_reel_path}")
