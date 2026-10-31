@@ -89,8 +89,8 @@
                 <span class="text-xs font-medium text-slate-400 mb-1 flex items-center gap-1.5">
                     <i data-lucide="clock" class="w-3.5 h-3.5 text-amber-400"></i> Next Scheduled
                 </span>
-                <span class="text-lg font-bold text-amber-300 tracking-tight">Today 11:00 AM</span>
-                <span class="text-[10px] text-slate-400 mt-1">Auto-Pilot Active</span>
+                <span class="text-sm font-bold text-amber-300 tracking-tight" id="stat-next">Today 11:00 AM IST</span>
+                <span class="text-[10px] text-slate-400 mt-1" id="stat-ist-time">Auto-Pilot Active (IST)</span>
             </div>
             <div class="glass-card rounded-2xl p-4 flex flex-col">
                 <span class="text-xs font-medium text-slate-400 mb-1 flex items-center gap-1.5">
@@ -334,6 +334,18 @@
         }
 
         // Fetch live stats on load
+        fetch("/api/status")
+            .then(r => r.json())
+            .then(d => {
+                if (d.next_scheduled_post) {
+                    document.getElementById("stat-next").innerText = d.next_scheduled_post;
+                }
+                if (d.ist_time) {
+                    document.getElementById("stat-ist-time").innerText = d.ist_time;
+                }
+            })
+            .catch(() => {});
+
         fetch("/stats")
             .then(r => r.json())
             .then(d => {
