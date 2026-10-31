@@ -107,6 +107,21 @@ class AudioService:
     def __init__(self, voice: str = "ur-PK-AsadNeural"):
         # ur-PK-AsadNeural provides authentic poetic Shayari lehza; fallback: hi-IN-MadhurNeural
         self.voice = voice
+        self.last_used_track: Optional[Path] = None
+
+    def _get_next_bgm_track(self, fallback_path: Path, total_duration: float) -> Path:
+        """Picks a track from assets/music/ ensuring it never repeats the same track consecutively."""
+        custom_tracks = sorted(list(MUSIC_DIR.glob("*.mp3")) + list(MUSIC_DIR.glob("*.wav")))
+        if custom_tracks:
+            available = [t for t in custom_tracks if t != self.last_used_track]
+            bg_music = random.choice(available) if available else custom_tracks[0]
+            self.last_used_track = bg_music
+            print(f"[BGM] Using rotated aesthetic BGM: {bg_music.name} (from {len(custom_tracks)} tracks)")
+            return bg_music
+        else:
+            synthesize_soulful_piano_bgm(fallback_path, duration_sec=total_duration + 2.0)
+            print(f"[BGM] Generated soulful acoustic piano BGM progression")
+            return fallback_path
 
     async def _create_voiceover_async(self, text: str, output_path: Path):
         # Format text with pauses for soulful poetic delivery
@@ -149,15 +164,9 @@ class AudioService:
         Mixes emotional voiceover + soulful piano background music (or custom BGM from assets/music/)
         with cinematic reverb, and attaches to video.
         """
-        # 1. Check for custom music in assets/music/
-        custom_tracks = list(MUSIC_DIR.glob("*.mp3")) + list(MUSIC_DIR.glob("*.wav"))
-        if custom_tracks:
-            bg_music = random.choice(custom_tracks)
-            print(f"[✓] Using custom BGM track from assets/music/: {bg_music.name}")
-        else:
-            bg_music = AUDIO_DIR / f"{video_path.stem}_piano.wav"
-            synthesize_soulful_piano_bgm(bg_music, duration_sec=total_duration + 2.0)
-            print(f"[✓] Generated soulful acoustic piano BGM progression")
+        # 1. Get rotated BGM track
+        fallback_bgm = AUDIO_DIR / f"{video_path.stem}_piano.wav"
+        bg_music = self._get_next_bgm_track(fallback_bgm, total_duration)
 
         output_video = video_path.with_name(f"{video_path.stem}_soulful.mp4")
 
@@ -210,14 +219,8 @@ class AudioService:
         Attaches pure aesthetic background music (without robotic voiceover).
         Prioritizes user's custom songs in assets/music/.
         """
-        custom_tracks = list(MUSIC_DIR.glob("*.mp3")) + list(MUSIC_DIR.glob("*.wav"))
-        if custom_tracks:
-            bg_music = random.choice(custom_tracks)
-            print(f"[✓] Using aesthetic BGM: {bg_music.name}")
-        else:
-            bg_music = AUDIO_DIR / "ambient_vibe.wav"
-            synthesize_soulful_piano_bgm(bg_music, duration_sec=duration_sec + 2.0)
-            print(f"[✓] Using synthesized aesthetic chord progression")
+        fallback_bgm = AUDIO_DIR / f"{video_path.stem}_ambient.wav"
+        bg_music = self._get_next_bgm_track(fallback_bgm, duration_sec)
 
         output_video = video_path.with_name(f"{video_path.stem}_music.mp4")
 
