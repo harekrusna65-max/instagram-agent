@@ -55,7 +55,13 @@
                         24/7 Cloud Active
                     </span>
                 </h1>
-                <p class="text-xs text-slate-400">Autonomous Content & Auto-Pilot Engine</p>
+                <div class="flex items-center gap-2">
+                    <p class="text-xs text-slate-400">Autonomous Content & Auto-Pilot Engine</p>
+                    <span class="text-slate-600">•</span>
+                    <span id="live-sync-badge" class="text-[11px] text-emerald-400/90 font-mono flex items-center gap-1">
+                        <i data-lucide="refresh-cw" class="w-3 h-3 animate-spin"></i> Live Syncing
+                    </span>
+                </div>
             </div>
         </div>
         <div class="flex items-center gap-2">
@@ -273,6 +279,9 @@
                 const res = await fetch("/trigger/reel", { method: "POST" });
                 const data = await res.json();
                 showStatus("🎉 Reel generation started! It will be live on Instagram in ~25 seconds.");
+                setTimeout(refreshLiveStats, 12000);
+                setTimeout(refreshLiveStats, 25000);
+                setTimeout(refreshLiveStats, 40000);
             } catch (e) {
                 showStatus("Error triggering reel: " + e.message, true);
             } finally {
@@ -291,6 +300,9 @@
                 const res = await fetch("/trigger/post", { method: "POST" });
                 const data = await res.json();
                 showStatus("🎉 Image post generation started! It will be live on Instagram in ~15 seconds.");
+                setTimeout(refreshLiveStats, 8000);
+                setTimeout(refreshLiveStats, 16000);
+                setTimeout(refreshLiveStats, 25000);
             } catch (e) {
                 showStatus("Error triggering post: " + e.message, true);
             } finally {
@@ -333,28 +345,47 @@
             txt.innerText = msg;
         }
 
-        // Fetch live stats on load
-        fetch("/api/status")
-            .then(r => r.json())
-            .then(d => {
-                if (d.next_scheduled_post) {
-                    document.getElementById("stat-next").innerText = d.next_scheduled_post;
-                }
-                if (d.ist_time) {
-                    document.getElementById("stat-ist-time").innerText = d.ist_time;
-                }
-            })
-            .catch(() => {});
+        async function refreshLiveStats() {
+            try {
+                const resStatus = await fetch("/api/status");
+                const dStatus = await resStatus.json();
 
-        fetch("/stats")
-            .then(r => r.json())
-            .then(d => {
-                if (d.profile) {
-                    document.getElementById("stat-followers").innerText = d.profile.follower_count || 33;
-                    document.getElementById("stat-posts").innerText = d.profile.media_count || 7;
+                if (dStatus.next_scheduled_post) {
+                    document.getElementById("stat-next").innerText = dStatus.next_scheduled_post;
                 }
-            })
-            .catch(() => {});
+                if (dStatus.ist_time) {
+                    document.getElementById("stat-ist-time").innerText = dStatus.ist_time;
+                }
+
+                const resStats = await fetch("/stats");
+                const dStats = await resStats.json();
+                if (dStats.profile) {
+                    if (dStats.profile.follower_count !== undefined) {
+                        document.getElementById("stat-followers").innerText = dStats.profile.follower_count;
+                    }
+                    if (dStats.profile.media_count !== undefined) {
+                        document.getElementById("stat-posts").innerText = dStats.profile.media_count;
+                    }
+                }
+
+                // Update sync indicator
+                const syncBadge = document.getElementById("live-sync-badge");
+                if (syncBadge) {
+                    const now = new Date();
+                    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    syncBadge.innerHTML = `<i data-lucide="check" class="w-3 h-3 text-emerald-400"></i> Synced ${timeStr}`;
+                    lucide.createIcons();
+                }
+            } catch (e) {
+                console.error("Auto-refresh error:", e);
+            }
+        }
+
+        // Initial fetch
+        refreshLiveStats();
+
+        // Auto-refresh every 10 seconds automatically (No manual page reload needed!)
+        setInterval(refreshLiveStats, 10000);
     </script>
 </body>
 </html>
