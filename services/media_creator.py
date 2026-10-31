@@ -25,9 +25,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 GENERATED_DIR = BASE_DIR / "generated"
 POSTS_DIR = GENERATED_DIR / "posts"
 REELS_DIR = GENERATED_DIR / "reels"
+BACKGROUNDS_DIR = BASE_DIR / "assets" / "backgrounds"
 
 POSTS_DIR.mkdir(parents=True, exist_ok=True)
 REELS_DIR.mkdir(parents=True, exist_ok=True)
+BACKGROUNDS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Aesthetic Palette Presets
 PALETTES = [
@@ -133,6 +135,56 @@ def wrap_text(text: str, font: ImageFont.FreeTypeFont, max_width: int, draw: Ima
         if current_line:
             lines.append(" ".join(current_line))
     return lines
+
+def layout_karaoke_words(text: str, font: ImageFont.FreeTypeFont, max_width: int, draw: ImageDraw.ImageDraw, total_height: int = 1920) -> Tuple[List[Dict], int]:
+    """
+    Computes precise (x, y) coordinates for each word to enable word-by-word glowing karaoke animation.
+    """
+    lines = []
+    paragraphs = text.split("\n")
+    for para in paragraphs:
+        if not para.strip():
+            continue
+        words = para.split(" ")
+        current_line = []
+        for word in words:
+            test_line = " ".join(current_line + [word])
+            bbox = draw.textbbox((0, 0), test_line, font=font)
+            w = bbox[2] - bbox[0]
+            if w <= max_width:
+                current_line.append(word)
+            else:
+                if current_line:
+                    lines.append(current_line)
+                current_line = [word]
+        if current_line:
+            lines.append(current_line)
+
+    line_h = 78
+    start_y = (total_height - len(lines) * line_h) // 2 - 25
+    karaoke_data = []
+    counter = 0
+    space_w = draw.textbbox((0, 0), " ", font=font)[2]
+
+    for l_idx, w_list in enumerate(lines):
+        line_w = draw.textbbox((0, 0), " ".join(w_list), font=font)[2]
+        cx = (1080 - line_w) // 2
+        cy = start_y + l_idx * line_h
+        for w in w_list:
+            wb = draw.textbbox((0, 0), w, font=font)
+            ww = wb[2] - wb[0]
+            karaoke_data.append({
+                "word": w,
+                "x": cx,
+                "y": cy,
+                "w": ww,
+                "global_idx": counter,
+                "is_last_line": (l_idx == len(lines) - 1 and len(lines) > 1)
+            })
+            cx += ww + space_w
+            counter += 1
+
+    return karaoke_data, start_y
 
 def create_cinematic_background(width: int, height: int, palette: Optional[Dict] = None) -> Image.Image:
     """Creates a high-end luxury gradient background with ambient orbs and subtle 35mm film grain."""
@@ -318,20 +370,16 @@ class MediaCreator:
     ) -> Path:
         """
         Creates a vertical 1080x1920 (9:16) MP4 video reel with:
+        - Real Cinematic Video B-Roll (from assets/backgrounds/ or procedural rainy night city)
+        - Word-by-Word Glowing Champagne Gold Karaoke Animation
         - Verified Creator Header (@stanger.man69 + Blue Badge)
-        - Animated Real-time Audio Spectrum Waveform Visualizer
-        - Floating Stardust Particles with sinusoidal sway
-        - Ken Burns Slow Camera Drift
-        - Butter-smooth ease-in/ease-out kinetic typography
-        - Champagne Gold punchline accent
+        - Real-time Dancing Audio Spectrum Equalizer
+        - Specular Frosted Glassmorphism card & 35mm film grain
         """
         W, H = 1080, 1920
         total_frames = duration_sec * fps
         timestamp = int(time.time())
         output_file = REELS_DIR / f"reel_{timestamp}.mp4"
-
-        palette = random.choice(PALETTES)
-        base_bg = create_cinematic_background(W, H, palette)
 
         fonts = {
             "sans_bold_med": get_font_by_type("sans_bold", 34),
@@ -349,48 +397,78 @@ class MediaCreator:
         dummy_img = Image.new("RGB", (W, H))
         d_draw = ImageDraw.Draw(dummy_img)
         hook_lines = wrap_text(hook, fonts["hook"], card_w - 180, d_draw)
-        quote_lines = wrap_text(quote, fonts["quote"], card_w - 180, d_draw)
+        karaoke_words, quote_start_y = layout_karaoke_words(quote, fonts["quote"], card_w - 180, d_draw, total_height=H)
+        total_words = max(1, len(karaoke_words))
 
-        # Particles
-        particles = [
+        # Check for custom B-roll video clip in assets/backgrounds/
+        broll_clips = list(BACKGROUNDS_DIR.glob("*.mp4")) + list(BACKGROUNDS_DIR.glob("*.mov"))
+        broll_cap = None
+        if broll_clips:
+            chosen_clip = random.choice(broll_clips)
+            broll_cap = cv2.VideoCapture(str(chosen_clip))
+            print(f"[B-Roll] Using video background from assets/backgrounds/: {chosen_clip.name}")
+        else:
+            print("[B-Roll] Using procedural cinematic rainy night city traffic simulation")
+
+        # Procedural Rain Simulation Assets
+        num_drops = 70
+        raindrops = [
             {
-                "x": random.randint(0, W),
+                "x": random.randint(30, W - 30),
                 "y": random.randint(0, H),
-                "speed": random.uniform(0.8, 2.2),
-                "radius": random.randint(1, 3),
-                "alpha": random.randint(60, 180),
-                "phase": random.uniform(0, 6.28)
+                "r": random.uniform(2.0, 4.5),
+                "speed": random.uniform(0.7, 2.6),
+                "streak": random.uniform(5.0, 15.0)
             }
-            for _ in range(40)
+            for _ in range(num_drops)
         ]
+
+        # Night city traffic bokeh orbs
+        palette = random.choice(PALETTES)
+        base_ambient_bg = create_cinematic_background(W, H, palette)
 
         # Video Writer
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         writer = cv2.VideoWriter(str(output_file), fourcc, fps, (W, H))
 
-        hook_end_frame = int(3.2 * fps)
+        hook_end_frame = int(3.0 * fps)
+        karaoke_start_frame = hook_end_frame
+        karaoke_end_frame = int(total_frames - (0.8 * fps))
+        frames_per_word = max(1, (karaoke_end_frame - karaoke_start_frame) // total_words)
 
         for frame_idx in range(total_frames):
-            frame_img = base_bg.copy()
-            draw = ImageDraw.Draw(frame_img)
+            # 1. Base B-Roll Layer
+            if broll_cap and broll_cap.isOpened():
+                ret, b_frame = broll_cap.read()
+                if not ret:
+                    broll_cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                    ret, b_frame = broll_cap.read()
+                if ret:
+                    b_frame_resized = cv2.resize(b_frame, (W, H))
+                    # Dark aesthetic tint & vignette
+                    b_frame_dark = cv2.convertScaleAbs(b_frame_resized, alpha=0.45, beta=-15)
+                    frame_img = Image.fromarray(cv2.cvtColor(b_frame_dark, cv2.COLOR_BGR2RGB)).convert("RGBA")
+                else:
+                    frame_img = base_ambient_bg.copy()
+            else:
+                # Procedural rainy night city glass
+                frame_img = base_ambient_bg.copy()
+                rain_draw = ImageDraw.Draw(frame_img)
+                for r in raindrops:
+                    r["y"] = (r["y"] + r["speed"]) % H
+                    rx, ry, rr, sl = int(r["x"]), int(r["y"]), r["r"], r["streak"]
+                    rain_draw.line([rx, ry - sl, rx, ry], fill=(210, 225, 255, 65), width=int(rr * 0.75))
+                    rain_draw.ellipse([rx - rr, ry - rr, rx + rr, ry + rr], fill=(235, 245, 255, 130))
 
-            # 1. Floating particles
-            for p in particles:
-                p["y"] = (p["y"] - p["speed"]) % H
-                px = int(p["x"] + 12 * math.sin(frame_idx * 0.04 + p["phase"]))
-                py = int(p["y"])
-                pr, pa = p["radius"], p["alpha"]
-                draw.ellipse([px - pr, py - pr, px + pr, py + pr], fill=(pa, pa, min(255, pa + 45), pa))
-
-            # 2. Glassmorphism Card Frame
+            # 2. Specular Frosted Glass Card
             card_overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
             cd = ImageDraw.Draw(card_overlay)
-            cd.rounded_rectangle([m_x, m_y, W - m_x, H - m_y], radius=44, fill=(16, 20, 36, 185), outline=(255, 255, 255, 34), width=2)
+            cd.rounded_rectangle([m_x, m_y, W - m_x, H - m_y], radius=44, fill=(14, 18, 34, 192), outline=(255, 255, 255, 34), width=2)
 
-            # Specular light sheen on top
+            # Specular light reflection on top edge
             for lx in range(m_x + 50, W - m_x - 50):
                 rel = (lx - (m_x + 50)) / (W - 2 * m_x - 100)
-                alpha = int(200 * (math.sin(rel * 3.14159) ** 2))
+                alpha = int(210 * (math.sin(rel * 3.14159) ** 2))
                 cd.point((lx, m_y + 1), fill=(255, 255, 255, alpha))
 
             frame_img = Image.alpha_composite(frame_img, card_overlay)
@@ -417,7 +495,7 @@ class MediaCreator:
                 col_b = int(247 + (60 - 247) * (bi / num_bars))
                 draw.rounded_rectangle([bx1, by1, bx2, by2], radius=3, fill=(col_r, col_g, col_b, 220))
 
-            # Phase 1: Hook Line (0 to 3.2s)
+            # Phase 1: Hook Line (0 to 3.0s)
             if frame_idx < hook_end_frame:
                 t = min(1.0, frame_idx / (0.8 * fps))
                 ease = t * t * (3 - 2 * t)
@@ -434,26 +512,32 @@ class MediaCreator:
                     draw.text((x + 2, y + 2), hl, fill=(0, 0, 0, alpha), font=fonts["hook"])
                     draw.text((x, y), hl, fill=(255, 255, 255, alpha), font=fonts["hook"])
             else:
-                # Phase 2: Poetic Quote Lines (3.2s to end)
-                t = min(1.0, (frame_idx - hook_end_frame) / (0.8 * fps))
-                ease = t * t * (3 - 2 * t)
-                alpha = int(ease * 255)
-                offset_y = int((1.0 - ease) * 18)
+                # Phase 2: Word-by-Word Glowing Karaoke Animation!
+                draw.text((m_x + 65, quote_start_y - 90), "“", fill=(130, 110, 195, 175), font=fonts["quote_mark"])
+                active_word_idx = (frame_idx - karaoke_start_frame) // frames_per_word
 
-                total_h = len(quote_lines) * 78
-                sy = (H - total_h) // 2 - 25 + offset_y
+                for w_item in karaoke_words:
+                    w_text = w_item["word"]
+                    wx, wy = w_item["x"], w_item["y"]
+                    g_idx = w_item["global_idx"]
+                    is_last = w_item["is_last_line"]
 
-                draw.text((m_x + 65, sy - 90), "“", fill=(130, 110, 195, int(alpha * 0.7)), font=fonts["quote_mark"])
+                    # Drop shadow
+                    draw.text((wx + 2, wy + 2), w_text, fill=(0, 0, 0, 200), font=fonts["quote"])
 
-                for i, ql in enumerate(quote_lines):
-                    qb = draw.textbbox((0, 0), ql, font=fonts["quote"])
-                    qw = qb[2] - qb[0]
-                    x = (W - qw) // 2
-                    y = sy + (i * 78)
-                    draw.text((x + 2, y + 2), ql, fill=(0, 0, 0, alpha), font=fonts["quote"])
-                    is_last = (i == len(quote_lines) - 1 and len(quote_lines) > 1)
-                    col = (255, 218, 128, alpha) if is_last else (248, 250, 252, alpha)
-                    draw.text((x, y), ql, fill=col, font=fonts["quote"])
+                    if g_idx < active_word_idx:
+                        # Already spoken words: crisp white or gold punchline
+                        col = (255, 218, 128) if is_last else (248, 250, 252)
+                        draw.text((wx, wy), w_text, fill=col, font=fonts["quote"])
+                    elif g_idx == active_word_idx:
+                        # Actively highlighted word: Glowing radiant champagne gold!
+                        glow_col = (255, 242, 170)
+                        draw.text((wx - 1, wy), w_text, fill=(245, 158, 11, 140), font=fonts["quote"])
+                        draw.text((wx + 1, wy), w_text, fill=(245, 158, 11, 140), font=fonts["quote"])
+                        draw.text((wx, wy), w_text, fill=glow_col, font=fonts["quote"])
+                    else:
+                        # Upcoming words: soft dimmed translucent silver
+                        draw.text((wx, wy), w_text, fill=(140, 150, 175, 115), font=fonts["quote"])
 
             # 5. Glowing Bottom Progress Bar
             progress_ratio = frame_idx / total_frames
@@ -464,6 +548,19 @@ class MediaCreator:
             writer.write(cv_frame)
 
         writer.release()
+        if broll_cap:
+            broll_cap.release()
+
+        # Generate thumbnail
+        thumb_path = output_file.with_suffix(".jpg")
+        cap = cv2.VideoCapture(str(output_file))
+        cap.set(cv2.CAP_PROP_POS_FRAMES, hook_end_frame + 20)
+        ret, frame = cap.read()
+        if ret:
+            cv2.imwrite(str(thumb_path), frame)
+        cap.release()
+
+        return output_file
 
         # Generate thumbnail
         thumb_path = output_file.with_suffix(".jpg")
