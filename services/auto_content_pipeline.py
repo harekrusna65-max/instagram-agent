@@ -129,6 +129,7 @@ class AutoContentPipeline:
         """
         self._ensure_vault_replenished()
         quote_id = None
+        category = "AESTHETIC REELS"
         if not hook or not quote:
             fresh = get_fresh_quote()
             if fresh:
