@@ -293,6 +293,7 @@ fun NativeStudioView(
         item {
             CustomShayariCard(
                 isLoading = state.isActionLoading,
+                onGenerate = { topic, onResult -> viewModel.generateShayari(topic, onResult) },
                 onPublish = { isReel, hook, quote -> viewModel.publishCustom(isReel, hook, quote) }
             )
         }
@@ -362,6 +363,7 @@ fun SlotBadge(name: String, isDone: Boolean) {
 @Composable
 fun CustomShayariCard(
     isLoading: Boolean,
+    onGenerate: (topic: String, onResult: (hook: String, quote: String) -> Unit) -> Unit,
     onPublish: (isReel: Boolean, hook: String?, quote: String) -> Unit
 ) {
     var hook by remember { mutableStateOf("") }
@@ -376,7 +378,22 @@ fun CustomShayariCard(
     ) {
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("✍️ Custom Shayari Studio", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            Text("Type your own poetry lines and post directly", color = TextMuted, fontSize = 11.sp)
+            Text("Type lines below, or tap an AI Mood to auto-fill:", color = TextMuted, fontSize = 11.sp)
+
+            // 1-Tap AI Mood Chips (Horizontal Scroll)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                PresetChip("⚡ Attitude") { onGenerate("attitude") { h, q -> hook = h; quote = q } }
+                PresetChip("🌙 Sukoon") { onGenerate("sukoon") { h, q -> hook = h; quote = q } }
+                PresetChip("❤️ Mohabbat") { onGenerate("mohabbat") { h, q -> hook = h; quote = q } }
+                PresetChip("🥀 Tanhai") { onGenerate("tanhai") { h, q -> hook = h; quote = q } }
+                PresetChip("⏳ Zindagi") { onGenerate("zindagi") { h, q -> hook = h; quote = q } }
+                PresetChip("🔥 Success") { onGenerate("success") { h, q -> hook = h; quote = q } }
+            }
 
             OutlinedTextField(
                 value = hook,

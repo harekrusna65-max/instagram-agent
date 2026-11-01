@@ -82,6 +82,19 @@ class MainScreenViewModel(
         }
     }
 
+    fun generateShayari(topic: String, onResult: (hook: String, quote: String) -> Unit) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(actionMessage = "✨ AI Generating $topic shayari...", isError = false) }
+            val res = client.generateShayari(topic)
+            res.onSuccess { data ->
+                _uiState.update { it.copy(actionMessage = "✨ Generated ${data.category} shayari!", isError = false) }
+                onResult(data.hook, data.quote)
+            }.onFailure { err ->
+                _uiState.update { it.copy(actionMessage = "Error: ${err.message}", isError = true) }
+            }
+        }
+    }
+
     fun publishCustom(isReel: Boolean, hook: String?, quote: String) {
         if (quote.isBlank()) {
             _uiState.update { it.copy(actionMessage = "Please enter a shayari/quote first!", isError = true) }

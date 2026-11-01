@@ -39,7 +39,29 @@ data class ScheduledItemData(
     val quote: String? = null
 )
 
+data class GeneratedShayariData(
+    val hook: String,
+    val quote: String,
+    val category: String
+)
+
 class InstagramApiClient(private val baseUrl: String = "https://instagram-agent-x9pn.onrender.com") {
+
+    suspend fun generateShayari(topic: String = "sukoon"): Result<GeneratedShayariData> = withContext(Dispatchers.IO) {
+        try {
+            val json = getRequest("$baseUrl/api/generate/shayari?topic=${URLEncoder.encode(topic, "UTF-8")}")
+            val obj = JSONObject(json)
+            Result.success(
+                GeneratedShayariData(
+                    hook = obj.optString("hook", ""),
+                    quote = obj.optString("quote", ""),
+                    category = obj.optString("category", topic.uppercase())
+                )
+            )
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 
     suspend fun getStatus(): Result<ServerStatusData> = withContext(Dispatchers.IO) {
         try {

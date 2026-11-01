@@ -101,6 +101,77 @@ class AIGenerator:
         ]
         return random.choice(templates)
 
+    def generate_ai_shayari(self, topic: str = "sukoon") -> Dict[str, str]:
+        """
+        Generate on-demand viral Shayari with Hook and Quote for the 1-Tap AI Generator feature.
+        """
+        topic_lower = (topic or "sukoon").lower().strip()
+
+        if self.has_gemini:
+            prompt = f"""
+            You are an elite Urdu/Hindi Shayar writing for a viral Instagram luxury aesthetic page (@stanger.man69).
+            Write a fresh, viral, deep 2-to-3 line Shayari on the theme: "{topic_lower}".
+            Rules:
+            1. Language: Poetic Roman Urdu / Hindi (Hinglish) that touches the heart.
+            2. The last line must have an impactful punchline word/phrase suitable for gold highlight.
+            3. Provide a scroll-stopping Hook line (e.g., 'Ye baat hamesha yaad rakhna...', 'Zindagi ka ek gehra sach...').
+            Output format strictly JSON with keys "hook", "quote", "category":
+            {{"hook": "...", "quote": "Line 1\\nLine 2\\nLine 3", "category": "{topic_lower.upper()}"}}
+            Return ONLY raw JSON, no markdown backticks.
+            """
+            try:
+                import json
+                resp = self.model.generate_content(prompt)
+                raw = resp.text.strip().replace("```json", "").replace("```", "").strip()
+                data = json.loads(raw)
+                if data.get("quote"):
+                    return {
+                        "hook": data.get("hook", "Ye baat dil me utar jaayegi..."),
+                        "quote": data.get("quote", ""),
+                        "category": data.get("category", topic_lower.upper())
+                    }
+            except Exception as e:
+                print(f"[!] Gemini shayari generation error: {e}")
+
+        # Curated Aesthetic Vault for 6 Core Themes
+        theme_pools = {
+            "attitude": [
+                ("Apni keemat itni badhao...", "Humse milne ke liye log taraste hain,\nKyunki hum bheed ka hissa nahi,\nApni dunya ke badshah hain."),
+                ("Kamyabi se shor machao...", "Khamoshi meri kamzori nahi mera mayaar hai,\nHum bolte kam hain,\nLekin jawab lajawab dete hain."),
+                ("Apna daur khud laenge...", "Jo log aaj hume dekh kar aage nikal gaye,\nKal wo hi humse milne ke liye,\nWaqt maangte nazar aayenge.")
+            ],
+            "mohabbat": [
+                ("Mohabbat ka sabse khoobsurat ehsaas...", "Kuch log zindagi me aate hain toh sukoon ban jaate hain,\nUnse baatein na bhi ho,\nToh bhi unka khayal dil ko sukoon deta hai."),
+                ("Ishq wo nahi jo dikhaya jaye...", "Mohabbat toh bas khamoshi se nibhai jaati hai,\nJahan lafzon ki zaroorat na ho,\nBas ek nazar me sab samajh aa jaye.")
+            ],
+            "tanhai": [
+                ("Raat ki tanhai me...", "Kabhi kabhi akele rehna hi behtar lagta hai,\nKyunki yahan koi jhootha dikhava nahi hota,\nBas hum hote hain aur hamari khamoshi."),
+                ("Dard lafzon me kahan aata hai...", "Umar thodi aur beet jaane do,\nKayi chehron se naqab utarenge,\nAur tab tumhe khamoshi ki keemat samajh aayegi.")
+            ],
+            "zindagi": [
+                ("Zindagi ka sabse bada sach...", "Waqt sabko ek sabak sikhata hai,\nJo log kal tak jaan the hamari,\nWo aaj bas ek yaad bankar reh gaye."),
+                ("Maturity tab aati hai jab...", "Jab aap har baat par behas karna chhod dete hain,\nAur muskurakar wahan se aage badh jaate hain,\nJahan kadar nahi hoti.")
+            ],
+            "success": [
+                ("Hausla itna bada rakho...", "Raste mushkil zaroor hain magar manzilen kareeb hain,\nMehnat itni shanti se karo,\nKi kamyabi dunya me toofan macha de."),
+                ("Sapne sach tab hote hain jab...", "Aaram ki dunya chhod kar,\nAap apne lakshya ke liye raat din ek kar dete hain.")
+            ],
+            "sukoon": [
+                ("Ye baat dil me utar jaayegi...", "Sukoon dunya ke shor me nahi,\nApne andar ki khamoshi me milta hai,\nJahan bas rab ki raza hoti hai."),
+                ("Midnight sukoon...", "Jab dil me koi jalan na ho aur niyat saaf ho,\nToh neend bhi sukoon ki aati hai,\nAur zindagi bhi khushnuma lagti hai.")
+            ]
+        }
+
+        # Select pool
+        matched_pool = theme_pools.get(topic_lower, theme_pools["sukoon"])
+        chosen_hook, chosen_quote = random.choice(matched_pool)
+
+        return {
+            "hook": chosen_hook,
+            "quote": chosen_quote,
+            "category": topic_lower.upper()
+        }
+
     def generate_fresh_vault_quotes(self, count: int = 5) -> List[Dict[str, str]]:
         """
         Autonomously generates fresh, viral-grade Shayari & Quotes to keep the Content Vault infinitely full.

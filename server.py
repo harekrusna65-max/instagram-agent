@@ -54,6 +54,7 @@ app = FastAPI(
 # Global instances & status tracking
 client = None
 pipeline = None
+ai_generator = None
 post_service = None
 engagement = None
 analytics = None
@@ -258,6 +259,16 @@ def trigger_post(background_tasks: BackgroundTasks, quote: str = None, category:
 
     background_tasks.add_task(task)
     return {"status": "success", "message": "Image Post generation and upload started in background."}
+
+@app.get("/api/generate/shayari")
+@app.post("/api/generate/shayari")
+def api_generate_shayari(topic: str = "sukoon"):
+    """1-Tap AI generator for viral hook & poetry lines based on mood."""
+    global ai_generator
+    if ai_generator is None:
+        ai_generator = AIGenerator()
+    data = ai_generator.generate_ai_shayari(topic=topic)
+    return {"status": "success", **data}
 
 @app.get("/api/schedule/list")
 def api_schedule_list():
