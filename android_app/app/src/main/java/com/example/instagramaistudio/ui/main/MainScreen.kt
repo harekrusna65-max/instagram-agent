@@ -7,9 +7,10 @@ import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -21,6 +22,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -42,7 +44,9 @@ fun MainScreen(
     val context = LocalContext.current
 
     Scaffold(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier
+            .fillMaxSize()
+            .navigationBarsPadding(),
         containerColor = DeepSpace,
         topBar = {
             TopAppBarGlass(
@@ -130,15 +134,20 @@ fun TopAppBarGlass(
         modifier = Modifier
             .fillMaxWidth()
             .background(CardBg)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.weight(1f)
+        ) {
             Box(
                 modifier = Modifier
-                    .size(38.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(10.dp))
                     .background(
                         Brush.linearGradient(
                             listOf(Color(0xFF833AB4), Color(0xFFFD1D1D), Color(0xFFFCB045))
@@ -146,21 +155,21 @@ fun TopAppBarGlass(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Text("📷", fontSize = 18.sp)
+                Text("📷", fontSize = 17.sp)
             }
 
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("Instagram AI Studio", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Text("Instagram AI Studio", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
                             .background(EmeraldBg)
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                            .padding(horizontal = 5.dp, vertical = 2.dp)
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(EmeraldGreen))
-                            Text("24/7 Cloud", color = EmeraldGreen, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(EmeraldGreen))
+                            Text("24/7 Cloud", color = EmeraldGreen, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -168,12 +177,12 @@ fun TopAppBarGlass(
             }
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onRefresh, modifier = Modifier.size(36.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onRefresh, modifier = Modifier.size(34.dp)) {
                 if (isRefreshing) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), color = PurpleAccent, strokeWidth = 2.dp)
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = PurpleAccent, strokeWidth = 2.dp)
                 } else {
-                    Text("🔄", fontSize = 16.sp)
+                    Text("🔄", fontSize = 15.sp)
                 }
             }
 
@@ -181,10 +190,10 @@ fun TopAppBarGlass(
                 onClick = onOpenProfile,
                 colors = ButtonDefaults.buttonColors(containerColor = CardBgLight),
                 shape = RoundedCornerShape(10.dp),
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                contentPadding = PaddingValues(horizontal = 9.dp, vertical = 4.dp),
                 modifier = Modifier.height(32.dp)
             ) {
-                Text("View IG", color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                Text("IG ↗", color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -200,7 +209,7 @@ fun NativeStudioView(
             .fillMaxSize()
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(vertical = 16.dp)
+        contentPadding = PaddingValues(top = 12.dp, bottom = 48.dp)
     ) {
         // 1. Stats Row
         item {
@@ -225,14 +234,16 @@ fun NativeStudioView(
             Card(
                 colors = CardDefaults.cardColors(containerColor = CardBg),
                 shape = RoundedCornerShape(18.dp),
-                modifier = Modifier.fillMaxWidth().border(1.dp, CardBorder, RoundedCornerShape(18.dp))
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, CardBorder, RoundedCornerShape(18.dp))
             ) {
                 Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Today's Slot Catch-Up Tracker", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        SlotBadge(name = "Morning Reel (11 AM)", isDone = state.status.morningDone)
-                        SlotBadge(name = "Afternoon Post (3 PM)", isDone = state.status.afternoonDone)
-                        SlotBadge(name = "Evening Reel (7 PM)", isDone = state.status.eveningDone)
+                        SlotBadge(name = "Morning (11 AM)", isDone = state.status.morningDone)
+                        SlotBadge(name = "Afternoon (3 PM)", isDone = state.status.afternoonDone)
+                        SlotBadge(name = "Evening (7 PM)", isDone = state.status.eveningDone)
                     }
                 }
             }
@@ -243,7 +254,9 @@ fun NativeStudioView(
             Card(
                 colors = CardDefaults.cardColors(containerColor = CardBg),
                 shape = RoundedCornerShape(18.dp),
-                modifier = Modifier.fillMaxWidth().border(1.dp, CardBorder, RoundedCornerShape(18.dp))
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, CardBorder, RoundedCornerShape(18.dp))
             ) {
                 Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("Instant 1-Click Publishing Hub", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
@@ -254,7 +267,9 @@ fun NativeStudioView(
                         enabled = !state.isActionLoading,
                         colors = ButtonDefaults.buttonColors(containerColor = PurpleAccent),
                         shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth().height(46.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(46.dp)
                     ) {
                         Text("🎬 Create & Post 12s Reel NOW", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
@@ -264,7 +279,9 @@ fun NativeStudioView(
                         enabled = !state.isActionLoading,
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
                         shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth().height(46.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(46.dp)
                     ) {
                         Text("🖼️ Create & Post Image NOW", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
@@ -307,7 +324,17 @@ fun StatCard(title: String, value: String, subtitle: String, modifier: Modifier 
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Text(title, color = TextMuted, fontSize = 11.sp)
-            Text(value, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1)
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = value,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = if (value.length > 14) 12.sp else 16.sp,
+                lineHeight = if (value.length > 14) 15.sp else 20.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(2.dp))
             Text(subtitle, color = PurpleAccent, fontSize = 10.sp, maxLines = 1)
         }
     }
@@ -343,7 +370,9 @@ fun CustomShayariCard(
     Card(
         colors = CardDefaults.cardColors(containerColor = CardBg),
         shape = RoundedCornerShape(18.dp),
-        modifier = Modifier.fillMaxWidth().border(1.dp, CardBorder, RoundedCornerShape(18.dp))
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, CardBorder, RoundedCornerShape(18.dp))
     ) {
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("✍️ Custom Shayari Studio", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
@@ -352,7 +381,7 @@ fun CustomShayariCard(
             OutlinedTextField(
                 value = hook,
                 onValueChange = { hook = it },
-                label = { Text("Hook Line (e.g. Ye baat hamesha yaad rakhna...)") },
+                label = { Text("Hook Line (e.g. Ye baat yaad rakhna...)") },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = Color.White,
                     unfocusedTextColor = Color.White,
@@ -421,7 +450,9 @@ fun ScheduleContentCard(
     Card(
         colors = CardDefaults.cardColors(containerColor = CardBg),
         shape = RoundedCornerShape(18.dp),
-        modifier = Modifier.fillMaxWidth().border(1.dp, CardBorder, RoundedCornerShape(18.dp))
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, CardBorder, RoundedCornerShape(18.dp))
     ) {
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("📅 Schedule Post / Reel (IST)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
@@ -451,9 +482,14 @@ fun ScheduleContentCard(
                 )
             }
 
-            // Quick Presets
+            // Quick Presets with Horizontal Scroll
             Text("Quick Presets (IST):", color = TextMuted, fontSize = 11.sp)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 PresetChip("+2 Hours") { scheduledTime = getFutureIST(2) }
                 PresetChip("Tomorrow 11 AM") { scheduledTime = getTomorrowIST(11, 0) }
                 PresetChip("Tomorrow 3 PM") { scheduledTime = getTomorrowIST(15, 0) }
@@ -478,8 +514,17 @@ fun ScheduleContentCard(
             )
 
             // Content Source Toggle
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                Text(if (isCustom) "✍️ Custom Shayari" else "🤖 Auto AI Vault Shayari", color = GoldAccent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    if (isCustom) "✍️ Custom Lines" else "🤖 Auto AI Vault Shayari",
+                    color = GoldAccent,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
                 TextButton(onClick = { isCustom = !isCustom }) {
                     Text(if (isCustom) "Switch to Auto AI" else "Switch to Custom", color = PurpleAccent, fontSize = 11.sp)
                 }
@@ -525,7 +570,9 @@ fun ScheduleContentCard(
                 enabled = !isLoading,
                 colors = ButtonDefaults.buttonColors(containerColor = PurpleAccent),
                 shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth().height(46.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(46.dp)
             ) {
                 Text("Schedule Post (IST)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
             }
@@ -540,9 +587,9 @@ fun PresetChip(text: String, onClick: () -> Unit) {
             .clip(RoundedCornerShape(8.dp))
             .background(CardBgLight)
             .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .padding(horizontal = 10.dp, vertical = 6.dp)
     ) {
-        Text(text, color = TextPrimary, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+        Text(text, color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1)
     }
 }
 
@@ -554,14 +601,18 @@ fun ScheduledQueueCard(
     Card(
         colors = CardDefaults.cardColors(containerColor = CardBg),
         shape = RoundedCornerShape(18.dp),
-        modifier = Modifier.fillMaxWidth().border(1.dp, CardBorder, RoundedCornerShape(18.dp))
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, CardBorder, RoundedCornerShape(18.dp))
     ) {
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("📋 Live Scheduled Queue", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
 
             if (items.isEmpty()) {
                 Box(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 16.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text("No upcoming scheduled posts. Use form above to schedule!", color = TextMuted, fontSize = 11.sp)
@@ -594,7 +645,12 @@ fun ScheduledRowItem(item: ScheduledItemData, onCancel: () -> Unit) {
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(if (item.mediaType == "reel") "🎬 Reel" else "🖼️ Post", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(badgeBg).padding(horizontal = 6.dp, vertical = 2.dp)) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(badgeBg)
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
                     Text(item.status.uppercase(), color = badgeColor, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                 }
             }
