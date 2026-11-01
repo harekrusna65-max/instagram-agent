@@ -155,9 +155,49 @@ def detect_shayari_mood(text: str = "", category: str = "") -> str:
     return best if scores[best] > 0 else "sukoon_midnight"
 
 
+def transliterate_to_devanagari(text: str) -> str:
+    """
+    Transliterates Roman Hindi / Urdu text into natural Devanagari Hindi.
+    This unlocks true human-sounding pronunciation in hi-IN-MadhurNeural,
+    eliminating synthetic robotic letter-by-letter English pronunciation!
+    """
+    if not text or not text.strip():
+        return ""
+    
+    # If text already contains Devanagari characters, return as is
+    if any("\u0900" <= c <= "\u097F" for c in text):
+        return text
+
+    import urllib.request
+    import urllib.parse
+    import json
+
+    lines = text.split("\n")
+    out_lines = []
+    for line in lines:
+        line_clean = line.strip()
+        if not line_clean:
+            out_lines.append("")
+            continue
+        try:
+            url = "https://inputtools.google.com/request?text=" + urllib.parse.quote(line_clean) + "&itc=hi-t-i0-und&num=1"
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=4) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                if data and data[0] == "SUCCESS":
+                    words = [item[1][0] if item[1] else item[0] for item in data[1]]
+                    out_lines.append(" ".join(words))
+                else:
+                    out_lines.append(line_clean)
+        except Exception:
+            out_lines.append(line_clean)
+
+    return "\n".join(out_lines)
+
+
 class AudioService:
     def __init__(self, voice: str = "hi-IN-MadhurNeural"):
-        # hi-IN-MadhurNeural provides authentic Hindi/Urdu poetry delivery for Latin/English script
+        # hi-IN-MadhurNeural provides authentic Hindi/Urdu poetry delivery for Devanagari script
         # Fallback: hi-IN-SwaraNeural or ur-IN-SalmanNeural
         self.voice = voice
         self.last_used_track: Optional[Path] = None
@@ -193,19 +233,20 @@ class AudioService:
         return bg_music
 
     async def _create_voiceover_async(self, text: str, output_path: Path):
-        # Format text with pauses for soulful poetic delivery
-        # Rate -10% gives authentic leisurely poetry delivery without truncation
+        # Format text with natural poetic rate & pitch for human emotional warmth
         communicate = edge_tts.Communicate(
             text,
             self.voice,
-            rate="-10%",
-            pitch="-2Hz"
+            rate="-7%",
+            pitch="-1Hz"
         )
         await communicate.save(str(output_path))
 
     def generate_poetic_voiceover(self, hook: str, quote: str, filename: str) -> Tuple[Path, float]:
         """
-        Creates a soul-touching poetic voiceover reading 100% of the words with natural pacing.
+        Creates an authentic, human-like emotional poetic voiceover.
+        Transliterates to natural Devanagari Hindi so edge-tts pronounces words with genuine
+        Urdu/Hindi lehza and soulful inflections rather than synthetic English phonemes.
         Returns: (voice_file_path, duration_seconds)
         """
         out_path = AUDIO_DIR / filename
@@ -214,19 +255,23 @@ class AudioService:
         clean_hook = (hook or "").strip(" .!?,")
         raw_lines = [l.strip(" .!?,") for l in (quote or "").split("\n") if l.strip()]
         
-        # Punctuate lines with subtle breathing pauses so every word is clearly enunciated
-        clean_quote = "...\n\n".join(raw_lines)
-        poetic_text = f"{clean_hook}...\n\n{clean_quote}..."
+        # Transliterate to pure Devanagari Hindi for native human pronunciation
+        deva_hook = transliterate_to_devanagari(clean_hook)
+        deva_lines = [transliterate_to_devanagari(l) for l in raw_lines]
+
+        # Punctuate lines with natural dramatic pauses (Poetic recitation rhythm)
+        clean_quote = "...\n\n".join(deva_lines)
+        poetic_text = f"{deva_hook}...\n\n{clean_quote}."
         
         try:
             asyncio.run(self._create_voiceover_async(poetic_text, out_path))
         except Exception as e:
-            print(f"[!] Primary voice failed ({e}), switching to hi-IN-SwaraNeural...")
+            print(f"[!] Primary voice notice ({e}), switching to hi-IN-SwaraNeural...")
             self.voice = "hi-IN-SwaraNeural"
             asyncio.run(self._create_voiceover_async(poetic_text, out_path))
 
         duration = get_media_duration(out_path)
-        print(f"[VOICEOVER] Generated {duration:.2f}s of soulful poetry voiceover at: {out_path.name}")
+        print(f"[VOICEOVER] Generated {duration:.2f}s of human-like poetry voiceover at: {out_path.name}")
         return out_path, duration
 
     def attach_audio_to_video(
@@ -238,8 +283,8 @@ class AudioService:
         category: str = ""
     ) -> Path:
         """
-        Mixes emotional voiceover + soulful background music intelligently matched to the emotion
-        with cinematic reverb, and attaches to video.
+        Mixes emotional voiceover + soulful background music with professional
+        studio mastering DSP (warmth EQ, de-harshing, broadcast compand) and attaches to video.
         """
         # 1. Get rotated BGM track matched to shayari emotion
         fallback_bgm = AUDIO_DIR / f"{video_path.stem}_piano.wav"
@@ -247,15 +292,25 @@ class AudioService:
 
         output_video = video_path.with_name(f"{video_path.stem}_soulful.mp4")
 
-        # FFmpeg filter:
-        # [0:a] voiceover: slight delay 0.4s, high quality volume 1.3
-        # [1:a] bgm: subtle volume 0.18 with soft fade-out
-        # aecho adds cinematic acoustic space
+        # Studio Voice Filterchain:
+        # 1. Warmth EQ: Boost 140Hz (+3.5dB) for deep human chest resonance (Shure SM7B broadcast feel)
+        # 2. De-harshing: Cut 3.2kHz (-2.0dB) to remove digital synthetic edge
+        # 3. Broadcast compand: Smooths dynamic range so whispers and punchlines are intimate & clear
+        # 4. adelay=400: Synchronizes with title card fade-in
+        # 5. Soft background music ducking (volume=0.20) with smooth fade-out and subtle ambient reverb
+        voice_filter = (
+            "equalizer=f=140:t=q:w=1.2:g=3.5,"
+            "equalizer=f=3200:t=q:w=2.0:g=-2.0,"
+            "compand=attacks=0.03:decays=0.25:points=-80/-80|-35/-24|-15/-10|0/-4:gain=2.5,"
+            "volume=1.35,adelay=400|400"
+        )
+        music_filter = f"volume=0.20,afade=t=out:st={max(1.0, total_duration - 2.5)}:d=2.5,aecho=0.8:0.7:45:0.25"
+
         filter_str = (
-            "[1:a]volume=1.35,adelay=400|400[voice];"
-            "[2:a]volume=0.20,afade=t=out:st={st}:d=2.0,aecho=0.8:0.7:50:0.3[music];"
-            "[voice][music]amix=inputs=2:duration=longest:dropout_transition=2[aout]"
-        ).format(st=max(1.0, total_duration - 2.0))
+            f"[1:a]{voice_filter}[voice];"
+            f"[2:a]{music_filter}[music];"
+            f"[voice][music]amix=inputs=2:duration=longest:dropout_transition=2[aout]"
+        )
 
         cmd = [
             FFMPEG_EXE,
