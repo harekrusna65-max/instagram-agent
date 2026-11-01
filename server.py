@@ -27,7 +27,13 @@ BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = BASE_DIR / "templates"
 IST = timezone(timedelta(hours=5, minutes=30))
 
-from database.db import init_db, get_unused_quote_count
+from database.db import (
+    init_db,
+    get_unused_quote_count,
+    is_slot_done_today,
+    record_slot_done,
+    get_today_slots_status
+)
 from core.client import InstagramAgentClient
 from services.auto_content_pipeline import AutoContentPipeline
 from services.ai_generator import AIGenerator
@@ -76,44 +82,49 @@ def init_agent() -> bool:
 def bg_scheduler_loop():
     global scheduler_running, last_post_info
     scheduler_running = True
-    print("[* SERVER] Background Auto-Pilot IST scheduler thread started...")
+    print("[* SERVER] Background Auto-Pilot IST slot-window scheduler started...")
 
     while True:
         try:
             now_ist = datetime.now(IST)
-            current_date_str = now_ist.strftime("%Y-%m-%d")
-            current_time_str = now_ist.strftime("%H:%M")
+            today_date = now_ist.strftime("%Y-%m-%d")
+            hour = now_ist.hour
 
-            # Try to initialize if not authenticated yet (every 2 minutes)
-            if pipeline is None and now_ist.second < 30:
+            # Auto-reconnect if pipeline not ready
+            if pipeline is None:
                 init_agent()
 
-            # Scheduled Slots in Indian Standard Time (IST):
-            # 1. 11:00 AM IST -> Aesthetic Video Reel
-            if current_time_str == "11:00" and last_run_events.get("reel_1") != current_date_str:
-                last_run_events["reel_1"] = current_date_str
-                print(f"[*] [IST 11:00 AM] Triggering Morning Reel...")
+            # 1. Slot 1: Morning Reel (Active window: 11:00 AM - 02:59 PM IST)
+            if 11 <= hour < 15 and not is_slot_done_today("morning_reel", today_date):
+                print(f"[*] [IST Morning Slot] Triggering Morning Reel for {today_date}...")
                 if pipeline:
                     res = pipeline.create_and_post_reel(duration_sec=12, use_voiceover=False)
-                    last_post_info = f"Reel published at {now_ist.strftime('%I:%M %p')}: {res.get('url', 'success')}"
+                    media_url = res.get("url", "")
+                    record_slot_done("morning_reel", today_date, media_url)
+                    last_post_info = f"Morning Reel published at {now_ist.strftime('%I:%M %p')}: {media_url}"
+                    print(f"[✓] Morning Reel recorded in daily log: {media_url}")
 
-            # 2. 03:00 PM IST -> Ultra-Aesthetic Graphic Post
-            elif current_time_str == "15:00" and last_run_events.get("post_1") != current_date_str:
-                last_run_events["post_1"] = current_date_str
-                print(f"[*] [IST 03:00 PM] Triggering Afternoon Image Post...")
+            # 2. Slot 2: Afternoon Post (Active window: 03:00 PM - 06:59 PM IST)
+            elif 15 <= hour < 19 and not is_slot_done_today("afternoon_post", today_date):
+                print(f"[*] [IST Afternoon Slot] Triggering Afternoon Image Post for {today_date}...")
                 if pipeline:
                     res = pipeline.create_and_post_image()
-                    last_post_info = f"Post published at {now_ist.strftime('%I:%M %p')}: {res.get('url', 'success')}"
+                    media_url = res.get("url", "")
+                    record_slot_done("afternoon_post", today_date, media_url)
+                    last_post_info = f"Afternoon Post published at {now_ist.strftime('%I:%M %p')}: {media_url}"
+                    print(f"[✓] Afternoon Post recorded in daily log: {media_url}")
 
-            # 3. 07:00 PM IST -> Prime-Time Viral Reel
-            elif current_time_str == "19:00" and last_run_events.get("reel_2") != current_date_str:
-                last_run_events["reel_2"] = current_date_str
-                print(f"[*] [IST 07:00 PM] Triggering Prime-Time Reel...")
+            # 3. Slot 3: Evening Prime-Time Reel (Active window: 07:00 PM - 11:59 PM IST)
+            elif 19 <= hour <= 23 and not is_slot_done_today("evening_reel", today_date):
+                print(f"[*] [IST Evening Slot] Triggering Evening Reel for {today_date}...")
                 if pipeline:
                     res = pipeline.create_and_post_reel(duration_sec=12, use_voiceover=False)
-                    last_post_info = f"Reel published at {now_ist.strftime('%I:%M %p')}: {res.get('url', 'success')}"
+                    media_url = res.get("url", "")
+                    record_slot_done("evening_reel", today_date, media_url)
+                    last_post_info = f"Evening Reel published at {now_ist.strftime('%I:%M %p')}: {media_url}"
+                    print(f"[✓] Evening Reel recorded in daily log: {media_url}")
 
-            # Background community engagement & scheduled tasks
+            # Community engagement processing every 15 mins
             if post_service:
                 post_service.process_pending_scheduled()
             if engagement and now_ist.minute % 15 == 0 and now_ist.second < 30:
@@ -147,20 +158,22 @@ def admin_panel(request: Request):
     # Fallback minimal HTML
     return HTMLResponse("<h1>Instagram AI Studio Online</h1><p>Status: Active</p>")
 
-from database.db import get_unused_quote_count
-
 @app.get("/api/status")
 def api_status():
-    """API endpoint returning raw system status JSON with IST awareness."""
+    """API endpoint returning raw system status JSON with IST awareness and slot tracking."""
     now_ist = datetime.now(IST)
     is_authed = bool(client and client.username and pipeline is not None)
+    today_date = now_ist.strftime("%Y-%m-%d")
+    slots_done = get_today_slots_status(today_date)
     
     # Calculate next scheduled post in IST
     curr_h_m = now_ist.strftime("%H:%M")
     if curr_h_m < "11:00":
         next_post = "Today 11:00 AM IST (Aesthetic Reel)"
     elif curr_h_m < "15:00":
-        next_post = "Today 03:00 PM IST (Image Post)"
+        next_post = "Done: Morning Reel" if slots_done["morning_reel"] else "Catching up: Morning Reel"
+        if curr_h_m >= "11:00" and not slots_done["afternoon_post"]:
+            next_post = "Today 03:00 PM IST (Image Post)"
     elif curr_h_m < "19:00":
         next_post = "Today 07:00 PM IST (Prime-Time Reel)"
     else:
@@ -172,6 +185,7 @@ def api_status():
         "account": f"@{client.username}" if is_authed else "Session Expired (Login Required)",
         "session_authenticated": is_authed,
         "vault_quotes_ready": get_unused_quote_count(),
+        "today_slots_published": slots_done,
         "hashtag_engine": "Smart Anti-Shadowban Rotator Active",
         "uptimerobot_keep_alive": "active",
         "scheduler": "running" if scheduler_running else "idle",

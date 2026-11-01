@@ -89,6 +89,18 @@ def init_db():
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
         """)
+
+        # Bulletproof Daily Autopilot Execution Tracker
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS daily_autopilot_log (
+                date TEXT NOT NULL, -- 'YYYY-MM-DD'
+                slot TEXT NOT NULL, -- 'morning_reel', 'afternoon_post', 'evening_reel'
+                status TEXT NOT NULL, -- 'published'
+                media_url TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (date, slot)
+            )
+        """)
         
         # Insert default keyword rules if empty
         cursor.execute("SELECT COUNT(*) as count FROM keyword_rules")
@@ -341,3 +353,35 @@ def add_keyword_rule(keyword: str, reply_comment: str, reply_dm: str):
             VALUES (?, ?, ?, 1)
         """, (keyword.lower().strip(), reply_comment, reply_dm))
         conn.commit()
+
+
+# --- Daily Autopilot Slot Helpers ---
+def is_slot_done_today(slot: str, date_str: str) -> bool:
+    """Checks if a given autopilot slot (morning_reel, afternoon_post, evening_reel) was done today."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT COUNT(*) as cnt FROM daily_autopilot_log 
+            WHERE date = ? AND slot = ?
+        """, (date_str, slot))
+        return cursor.fetchone()["cnt"] > 0
+
+
+def record_slot_done(slot: str, date_str: str, media_url: str = ""):
+    """Records that a slot was published today."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT OR REPLACE INTO daily_autopilot_log (date, slot, status, media_url)
+            VALUES (?, ?, 'published', ?)
+        """, (date_str, slot, media_url))
+        conn.commit()
+
+
+def get_today_slots_status(date_str: str) -> Dict[str, bool]:
+    """Returns status of all 3 slots for today."""
+    return {
+        "morning_reel": is_slot_done_today("morning_reel", date_str),
+        "afternoon_post": is_slot_done_today("afternoon_post", date_str),
+        "evening_reel": is_slot_done_today("evening_reel", date_str)
+    }
