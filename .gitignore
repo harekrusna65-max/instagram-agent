@@ -23,3 +23,9 @@ cacert_win.pem
 generated/
 
 RENDER_SESSION_ENV.txt
+
+# Android build outputs
+android_app/**/build/
+android_app/.gradle/
+android_app/local.properties
+*.apk
