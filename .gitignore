@@ -29,3 +29,8 @@ android_app/**/build/
 android_app/.gradle/
 android_app/local.properties
 *.apk
+
+# Temporary screenshots & test audio
+*.png
+*.mp3
+*.wav

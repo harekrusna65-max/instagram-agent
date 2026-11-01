@@ -9,7 +9,8 @@ from database.db import (
     add_scheduled_post,
     get_pending_scheduled_posts,
     mark_post_published,
-    mark_post_failed
+    mark_post_failed,
+    record_quote_published
 )
 
 class PostService:
@@ -75,6 +76,13 @@ class PostService:
 
                 media_id = res.get("media_id", res.get("url", "live"))
                 mark_post_published(item["id"], media_id)
+                if item.get("quote"):
+                    record_quote_published(
+                        quote_text=item["quote"],
+                        hook=item.get("hook") or "",
+                        category=m_type,
+                        media_type=m_type
+                    )
                 post_url = res.get("url", "")
                 print(f"[✓] Scheduled post #{item['id']} published successfully! URL: {post_url}")
                 try:

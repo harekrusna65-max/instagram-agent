@@ -106,6 +106,19 @@ def init_db():
             )
         """)
 
+        # Permanent Published Archive (Strict Anti-Duplicate Guarantee across entire lifetime)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS published_quotes_archive (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                quote_hash TEXT NOT NULL UNIQUE,
+                hook TEXT,
+                quote TEXT NOT NULL,
+                category TEXT,
+                media_type TEXT,
+                published_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
         # Bulletproof Daily Autopilot Execution Tracker
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS daily_autopilot_log (
@@ -317,9 +330,16 @@ SEEDED_QUOTES = [
 ]
 
 def seed_content_vault():
+    """Seeds the vault with all 120+ authentic curated shayaris from ShayariService."""
+    try:
+        from services.shayari_service import MASTER_SHAYARI_ARCHIVE
+        seed_list = MASTER_SHAYARI_ARCHIVE
+    except Exception:
+        seed_list = SEEDED_QUOTES
+
     with get_connection() as conn:
         cursor = conn.cursor()
-        for item in SEEDED_QUOTES:
+        for item in seed_list:
             cursor.execute("""
                 INSERT OR IGNORE INTO content_vault (category, hook, quote, caption, is_used)
                 VALUES (?, ?, ?, ?, 0)
@@ -336,7 +356,7 @@ def get_unused_quote_count() -> int:
 
 
 def replenish_vault_with_quotes(quotes: List[Dict[str, str]]) -> int:
-    """Inserts freshly generated AI quotes into vault."""
+    """Inserts freshly generated quotes into vault."""
     added = 0
     with get_connection() as conn:
         cursor = conn.cursor()
@@ -354,19 +374,79 @@ def replenish_vault_with_quotes(quotes: List[Dict[str, str]]) -> int:
     return added
 
 
+def get_all_used_quote_hashes() -> set:
+    """Returns SHA-256 hashes of all quotes that have ever been published or marked used."""
+    import hashlib
+    hashes = set()
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT quote_hash FROM published_quotes_archive")
+        for r in cursor.fetchall():
+            if r["quote_hash"]:
+                hashes.add(r["quote_hash"])
+        cursor.execute("SELECT quote FROM content_vault WHERE is_used = 1")
+        for r in cursor.fetchall():
+            if r["quote"]:
+                clean = " ".join(r["quote"].lower().split())
+                hashes.add(hashlib.sha256(clean.encode("utf-8")).hexdigest())
+        cursor.execute("SELECT quote FROM scheduled_posts WHERE status = 'published' AND quote IS NOT NULL")
+        for r in cursor.fetchall():
+            if r["quote"]:
+                clean = " ".join(r["quote"].lower().split())
+                hashes.add(hashlib.sha256(clean.encode("utf-8")).hexdigest())
+    return hashes
+
+
+def is_quote_published(quote_text: str) -> bool:
+    """Checks whether this exact quote has ever been published before."""
+    import hashlib
+    clean = " ".join((quote_text or "").lower().split())
+    h = hashlib.sha256(clean.encode("utf-8")).hexdigest()
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1 FROM published_quotes_archive WHERE quote_hash = ?", (h,))
+        if cursor.fetchone():
+            return True
+        cursor.execute("SELECT 1 FROM content_vault WHERE is_used = 1 AND quote = ?", (quote_text,))
+        if cursor.fetchone():
+            return True
+    return False
+
+
+def record_quote_published(quote_text: str, hook: str = "", category: str = "", media_type: str = ""):
+    """Permanently records that a quote has been published so it is NEVER repeated."""
+    import hashlib
+    clean = " ".join((quote_text or "").lower().split())
+    h = hashlib.sha256(clean.encode("utf-8")).hexdigest()
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT OR IGNORE INTO published_quotes_archive (quote_hash, hook, quote, category, media_type)
+            VALUES (?, ?, ?, ?, ?)
+        """, (h, hook, quote_text, category, media_type))
+        cursor.execute("""
+            UPDATE content_vault 
+            SET is_used = 1, used_at = ? 
+            WHERE quote = ?
+        """, (now_str, quote_text))
+        conn.commit()
+
+
 def get_fresh_quote(category: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """
-    Fetches an UNUSED quote from the vault.
-    Guarantees that no quote/shayari is ever repeated!
+    Fetches an UNUSED, never-published quote from the vault.
+    Guarantees that no quote/shayari is EVER repeated!
+    Never resets is_used to 0. If vault is running low, dynamically generates brand new unique quotes!
     """
     with get_connection() as conn:
         cursor = conn.cursor()
         if category:
             cursor.execute("""
                 SELECT * FROM content_vault 
-                WHERE is_used = 0 AND category = ?
+                WHERE is_used = 0 AND category LIKE ?
                 ORDER BY RANDOM() LIMIT 1
-            """, (category,))
+            """, (f"%{category}%",))
         else:
             cursor.execute("""
                 SELECT * FROM content_vault 
@@ -376,24 +456,52 @@ def get_fresh_quote(category: Optional[str] = None) -> Optional[Dict[str, Any]]:
         row = cursor.fetchone()
         if row:
             return dict(row)
-        
-        # If all quotes have been used, reset and recycle or fetch any
-        cursor.execute("UPDATE content_vault SET is_used = 0")
-        conn.commit()
-        cursor.execute("SELECT * FROM content_vault ORDER BY RANDOM() LIMIT 1")
-        row = cursor.fetchone()
-        return dict(row) if row else None
+
+    # If all existing quotes in vault are exhausted, DO NOT RESET is_used!
+    # Generate a brand-new unique quote using the procedural and online engine.
+    try:
+        from services.shayari_service import ShayariService
+        svc = ShayariService()
+        used = get_all_used_quote_hashes()
+        new_q = svc.get_unique_quote(category=category, exclude_hashes=used)
+        add_custom_quote_to_vault(
+            category=new_q["category"],
+            hook=new_q["hook"],
+            quote=new_q["quote"],
+            caption=new_q["caption"]
+        )
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM content_vault WHERE quote = ?", (new_q["quote"],))
+            fresh_row = cursor.fetchone()
+            if fresh_row:
+                return dict(fresh_row)
+        return new_q
+    except Exception as e:
+        print(f"[!] Dynamic fresh quote generation notice: {e}")
+        return None
 
 
-def mark_quote_as_used(quote_id: int):
+def mark_quote_as_used(quote_id: int, media_type: str = ""):
+    """Marks a quote as used in vault AND writes to permanent published archive."""
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     with get_connection() as conn:
         cursor = conn.cursor()
+        cursor.execute("SELECT * FROM content_vault WHERE id = ?", (quote_id,))
+        row = cursor.fetchone()
         cursor.execute("""
             UPDATE content_vault 
             SET is_used = 1, used_at = ? 
             WHERE id = ?
         """, (now_str, quote_id))
+        if row:
+            import hashlib
+            clean = " ".join(row["quote"].lower().split())
+            h = hashlib.sha256(clean.encode("utf-8")).hexdigest()
+            cursor.execute("""
+                INSERT OR IGNORE INTO published_quotes_archive (quote_hash, hook, quote, category, media_type)
+                VALUES (?, ?, ?, ?, ?)
+            """, (h, row["hook"], row["quote"], row["category"], media_type))
         conn.commit()
 
 

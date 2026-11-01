@@ -18,8 +18,12 @@ from database.db import (
     get_fresh_quote,
     mark_quote_as_used,
     get_unused_quote_count,
-    replenish_vault_with_quotes
+    replenish_vault_with_quotes,
+    is_quote_published,
+    record_quote_published,
+    get_all_used_quote_hashes
 )
+from services.shayari_service import ShayariService
 
 # Curated viral quotes library (Aesthetic Shayari, Deep Life, Love, Attitude)
 CURATED_QUOTES = [
@@ -59,14 +63,21 @@ class AutoContentPipeline:
         self.hashtags = HashtagRotator()
 
     def _ensure_vault_replenished(self):
-        """Auto-generate fresh AI quotes if content vault is getting low."""
+        """Auto-generate fresh unique quotes if content vault is getting low (Guarantees infinite content)."""
         try:
             cnt = get_unused_quote_count()
-            if cnt < 4:
-                print(f"[*] Content Vault running low ({cnt} left). Autonomously generating 6 fresh AI quotes...")
-                fresh_batch = self.ai.generate_fresh_vault_quotes(count=6)
+            if cnt < 15:
+                print(f"[*] Content Vault running low ({cnt} unused left). Generating 25 fresh unique shayaris...")
+                svc = ShayariService()
+                used_hashes = get_all_used_quote_hashes()
+                fresh_batch = []
+                for _ in range(25):
+                    q = svc.get_unique_quote(exclude_hashes=used_hashes)
+                    h = svc.get_hash(q["quote"])
+                    used_hashes.add(h)
+                    fresh_batch.append(q)
                 added = replenish_vault_with_quotes(fresh_batch)
-                print(f"[✓] Added {added} fresh quotes to Content Vault! Total unused now: {get_unused_quote_count()}")
+                print(f"[✓] Added {added} fresh unique quotes to Content Vault! Total unused now: {get_unused_quote_count()}")
         except Exception as e:
             print(f"[!] Vault replenishment notice: {e}")
 
@@ -76,9 +87,15 @@ class AutoContentPipeline:
         category: Optional[str] = None,
         caption: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Generate an aesthetic image post and upload it to Instagram."""
+        """Generate an aesthetic image post and upload it to Instagram with strict anti-duplicate guarantee."""
         self._ensure_vault_replenished()
         quote_id = None
+
+        # Check if user-provided quote was already published before
+        if quote and is_quote_published(quote):
+            print(f"[!] Warning: Quote was already published in a previous post! Picking fresh unique quote to avoid repetition.")
+            quote = None
+
         if not quote:
             fresh = get_fresh_quote(category)
             if fresh:
@@ -89,11 +106,12 @@ class AutoContentPipeline:
                 caption = caption or f"{caption_base}\n\n{smart_tags}"
                 quote_id = fresh.get("id")
             else:
-                selected = random.choice(CURATED_QUOTES)
-                quote = selected["quote"]
-                category = category or selected["category"]
+                svc = ShayariService()
+                fresh_item = svc.get_unique_quote(category=category, exclude_hashes=get_all_used_quote_hashes())
+                quote = fresh_item["quote"]
+                category = category or fresh_item["category"]
                 smart_tags = self.hashtags.get_smart_hashtags(category=category)
-                caption = caption or f"{selected['caption'].split('#')[0].strip()}\n\n{smart_tags}"
+                caption = caption or f"{fresh_item['caption'].split('#')[0].strip()}\n\n{smart_tags}"
         else:
             category = category or "AESTHETIC POST"
             if not caption:
@@ -108,10 +126,11 @@ class AutoContentPipeline:
         print("[*] Uploading image post to Instagram...")
         res = self.post_service.publish_now(str(img_path), "photo", caption)
         
-        # Mark quote as used so it never repeats
+        # Permanently record quote as published and mark as used (Strict anti-duplicate)
+        record_quote_published(quote, hook=category or "", category=category or "", media_type="photo")
         if quote_id:
-            mark_quote_as_used(quote_id)
-            print(f"[✓] Quote #{quote_id} marked as used in database (Anti-duplicate).")
+            mark_quote_as_used(quote_id, media_type="photo")
+            print(f"[✓] Quote #{quote_id} permanently recorded as published in database.")
 
         print(f"[✓] Successfully published image post! URL: {res.get('url')}")
         return res
@@ -126,11 +145,18 @@ class AutoContentPipeline:
     ) -> Dict[str, Any]:
         """
         Generate an animated vertical video reel with soulful aesthetic music.
-        By default uses pure atmospheric aesthetic BGM (No robotic AI voice) for maximum virality.
+        Strict anti-duplicate: every reel has a 100% unique quote.
         """
         self._ensure_vault_replenished()
         quote_id = None
         category = "AESTHETIC REELS"
+
+        # Check if user-provided quote was already published before
+        if quote and is_quote_published(quote):
+            print(f"[!] Warning: Reel quote was already published in a previous post! Picking fresh unique quote.")
+            hook = None
+            quote = None
+
         if not hook or not quote:
             fresh = get_fresh_quote()
             if fresh:
@@ -142,13 +168,16 @@ class AutoContentPipeline:
                 caption = caption or f"{caption_base}\n\n{smart_tags}"
                 quote_id = fresh.get("id")
             else:
-                selected = random.choice(CURATED_QUOTES)
-                hook = hook or selected["hook"]
-                quote = quote or selected["quote"]
-                smart_tags = self.hashtags.get_smart_hashtags(category=selected["category"])
-                caption = caption or f"{selected['caption'].split('#')[0].strip()}\n\n{smart_tags}"
+                svc = ShayariService()
+                fresh_item = svc.get_unique_quote(exclude_hashes=get_all_used_quote_hashes())
+                hook = hook or fresh_item["hook"]
+                quote = quote or fresh_item["quote"]
+                smart_tags = self.hashtags.get_smart_hashtags(category=fresh_item["category"])
+                caption = caption or f"{fresh_item['caption'].split('#')[0].strip()}\n\n{smart_tags}"
         elif not caption:
             gen = self.ai.generate_caption(f"{hook} {quote[:30]}", tone="viral aesthetic reel")
+            smart_tags = self.hashtags.get_smart_hashtags(category="VIRAL_REELS")
+            caption = f"{gen['caption'].split('#')[0].strip()}\n\n{smart_tags}"
             smart_tags = self.hashtags.get_smart_hashtags(category="VIRAL_REELS")
             caption = f"{gen['caption'].split('#')[0].strip()}\n\n{smart_tags}"
 
@@ -204,10 +233,11 @@ class AutoContentPipeline:
         print("[*] Step 3: Uploading Reel to Instagram...")
         res = self.post_service.publish_now(str(final_reel_path), "reel", caption)
 
-        # Mark quote as used so it never repeats
+        # Permanently record quote as published and mark as used (Strict anti-duplicate)
+        record_quote_published(quote, hook=hook or "", category=category or "", media_type="reel")
         if quote_id:
-            mark_quote_as_used(quote_id)
-            print(f"[✓] Quote #{quote_id} marked as used in database (Anti-duplicate).")
+            mark_quote_as_used(quote_id, media_type="reel")
+            print(f"[✓] Quote #{quote_id} permanently recorded as published in database.")
 
         print(f"[✓] Successfully published Reel! URL: {res.get('url')}")
         return res

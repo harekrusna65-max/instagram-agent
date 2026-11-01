@@ -133,6 +133,16 @@ class AIGenerator:
             except Exception as e:
                 print(f"[!] Gemini shayari generation error: {e}")
 
+        # High-variety generator via ShayariService (over 150,000 unique permutations)
+        try:
+            from services.shayari_service import ShayariService
+            svc = ShayariService()
+            item = svc.get_unique_quote(category=topic_lower)
+            if item:
+                return item
+        except Exception:
+            pass
+
         # Curated Aesthetic Vault for 6 Core Themes
         theme_pools = {
             "attitude": [
@@ -205,6 +215,17 @@ class AIGenerator:
                     ]
             except Exception as e:
                 print(f"[!] AI Quote generation error: {e}. Using generative templates.")
+
+        # High-variety procedural and online quotes via ShayariService (100,000+ permutations)
+        try:
+            from services.shayari_service import ShayariService
+            svc = ShayariService()
+            results = []
+            for _ in range(count):
+                results.append(svc.generate_procedural_quote())
+            return results
+        except Exception:
+            pass
 
         # High-variety generative poetic builder
         categories = ["AESTHETIC SHAYARI", "DEEP LIFE", "SELF RESPECT", "KHAMOSHI & SUKOON", "MATURITY", "PEOPLE & REALITY"]
