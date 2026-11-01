@@ -156,8 +156,9 @@ def detect_shayari_mood(text: str = "", category: str = "") -> str:
 
 
 class AudioService:
-    def __init__(self, voice: str = "ur-PK-AsadNeural"):
-        # ur-PK-AsadNeural provides authentic poetic Shayari lehza; fallback: hi-IN-MadhurNeural
+    def __init__(self, voice: str = "hi-IN-MadhurNeural"):
+        # hi-IN-MadhurNeural provides authentic Hindi/Urdu poetry delivery for Latin/English script
+        # Fallback: hi-IN-SwaraNeural or ur-IN-SalmanNeural
         self.voice = voice
         self.last_used_track: Optional[Path] = None
 
@@ -193,33 +194,39 @@ class AudioService:
 
     async def _create_voiceover_async(self, text: str, output_path: Path):
         # Format text with pauses for soulful poetic delivery
-        # Rate -15% slows down speech for deep emotional impact
+        # Rate -10% gives authentic leisurely poetry delivery without truncation
         communicate = edge_tts.Communicate(
             text,
             self.voice,
-            rate="-16%",
-            pitch="-3Hz"
+            rate="-10%",
+            pitch="-2Hz"
         )
         await communicate.save(str(output_path))
 
     def generate_poetic_voiceover(self, hook: str, quote: str, filename: str) -> Tuple[Path, float]:
         """
-        Creates a soul-touching poetic voiceover with dramatic pauses.
+        Creates a soul-touching poetic voiceover reading 100% of the words with natural pacing.
         Returns: (voice_file_path, duration_seconds)
         """
         out_path = AUDIO_DIR / filename
         
-        # Punctuate and add natural breathing pauses
-        poetic_text = f"{hook.strip(' .')}...\n\n{quote.strip()}\n\n..."
+        # Format hook and clean every line of the shayari
+        clean_hook = (hook or "").strip(" .!?,")
+        raw_lines = [l.strip(" .!?,") for l in (quote or "").split("\n") if l.strip()]
+        
+        # Punctuate lines with subtle breathing pauses so every word is clearly enunciated
+        clean_quote = "...\n\n".join(raw_lines)
+        poetic_text = f"{clean_hook}...\n\n{clean_quote}..."
         
         try:
             asyncio.run(self._create_voiceover_async(poetic_text, out_path))
         except Exception as e:
-            print(f"[!] Primary voice failed ({e}), switching to hi-IN-MadhurNeural...")
-            self.voice = "hi-IN-MadhurNeural"
+            print(f"[!] Primary voice failed ({e}), switching to hi-IN-SwaraNeural...")
+            self.voice = "hi-IN-SwaraNeural"
             asyncio.run(self._create_voiceover_async(poetic_text, out_path))
 
         duration = get_media_duration(out_path)
+        print(f"[VOICEOVER] Generated {duration:.2f}s of soulful poetry voiceover at: {out_path.name}")
         return out_path, duration
 
     def attach_audio_to_video(
@@ -247,7 +254,7 @@ class AudioService:
         filter_str = (
             "[1:a]volume=1.35,adelay=400|400[voice];"
             "[2:a]volume=0.20,afade=t=out:st={st}:d=2.0,aecho=0.8:0.7:50:0.3[music];"
-            "[voice][music]amix=inputs=2:duration=first[aout]"
+            "[voice][music]amix=inputs=2:duration=longest:dropout_transition=2[aout]"
         ).format(st=max(1.0, total_duration - 2.0))
 
         cmd = [
@@ -255,6 +262,7 @@ class AudioService:
             "-y",
             "-i", str(video_path),
             "-i", str(voice_mp3),
+            "-stream_loop", "-1",
             "-i", str(bg_music),
             "-filter_complex", filter_str,
             "-map", "0:v:0",

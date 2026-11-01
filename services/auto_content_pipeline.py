@@ -5,6 +5,7 @@ Generates aesthetic media (Post / Reel), crafts viral captions, and uploads dire
 
 import random
 import math
+import time
 from pathlib import Path
 from typing import Dict, Any, Optional
 from core.client import InstagramAgentClient
@@ -151,9 +152,26 @@ class AutoContentPipeline:
             smart_tags = self.hashtags.get_smart_hashtags(category="VIRAL_REELS")
             caption = f"{gen['caption'].split('#')[0].strip()}\n\n{smart_tags}"
 
-        total_duration = float(duration_sec)
+        combined_text = f"{hook or ''} {quote or ''}"
+        voice_path = None
+        voice_dur = 0.0
 
-        # Step 1: Render Video
+        # When voiceover is requested, generate speech FIRST to compute the exact video duration
+        # This guarantees 100% of the shayari words are read and none are cut off!
+        if use_voiceover:
+            print("[*] Generating full poetic voiceover first to dynamically match video duration...")
+            voice_path, voice_dur = self.audio_service.generate_poetic_voiceover(
+                hook=hook,
+                quote=quote,
+                filename=f"voice_{int(time.time())}.mp3"
+            )
+            # Video duration = exact spoken duration + 2.5s lingering buffer for emotional BGM fade-out
+            total_duration = max(float(duration_sec), float(math.ceil(voice_dur + 2.5)))
+            print(f"[✓] Voiceover duration: {voice_dur:.2f}s -> Adjusted video length: {total_duration:.1f}s")
+        else:
+            total_duration = float(duration_sec)
+
+        # Step 1: Render Video matching exact duration
         print(f"[*] Step 1: Rendering vertical aesthetic video reel ({total_duration}s)...")
         raw_reel_path = self.creator.create_aesthetic_reel(
             hook=hook,
@@ -162,15 +180,9 @@ class AutoContentPipeline:
         )
         print(f"[✓] Reel video rendered: {raw_reel_path}")
 
-        # Step 2: Attach Pure Aesthetic BGM matched to Shayari emotion
-        combined_text = f"{hook or ''} {quote or ''}"
-        if use_voiceover:
-            print("[*] Step 2: Generating voiceover and mixing with BGM...")
-            voice_path, voice_dur = self.audio_service.generate_poetic_voiceover(
-                hook=hook,
-                quote=quote,
-                filename="voice_custom.mp3"
-            )
+        # Step 2: Attach Audio
+        if use_voiceover and voice_path:
+            print(f"[*] Step 2: Attaching complete voiceover ({voice_dur:.2f}s) + mood BGM...")
             final_reel_path = self.audio_service.attach_audio_to_video(
                 video_path=raw_reel_path,
                 voice_mp3=voice_path,

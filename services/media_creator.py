@@ -431,9 +431,10 @@ class MediaCreator:
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         writer = cv2.VideoWriter(str(output_file), fourcc, fps, (W, H))
 
-        hook_end_frame = int(3.0 * fps)
+        hook_end_frame = int(2.8 * fps)
         karaoke_start_frame = hook_end_frame
-        karaoke_end_frame = int(total_frames - (0.8 * fps))
+        # Paced smoothly so words glow as they are spoken, reserving last ~2s for final gold linger
+        karaoke_end_frame = max(karaoke_start_frame + int(fps * 2.0), int(total_frames - (2.0 * fps)))
         frames_per_word = max(1, (karaoke_end_frame - karaoke_start_frame) // total_words)
 
         for frame_idx in range(total_frames):
