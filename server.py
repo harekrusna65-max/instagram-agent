@@ -108,6 +108,11 @@ def bg_scheduler_loop():
                     record_slot_done("morning_reel", today_date, media_url)
                     last_post_info = f"Morning Reel published at {now_ist.strftime('%I:%M %p')}: {media_url}"
                     print(f"[✓] Morning Reel recorded in daily log: {media_url}")
+                    try:
+                        from services.notification_service import send_push_notification
+                        send_push_notification("🌅 Morning Reel Published!", f"Morning Reel is live on Instagram: {media_url}", media_url)
+                    except Exception:
+                        pass
 
             # 2. Slot 2: Afternoon Post (Active window: 03:00 PM - 06:59 PM IST)
             elif 15 <= hour < 19 and not is_slot_done_today("afternoon_post", today_date):
@@ -118,6 +123,11 @@ def bg_scheduler_loop():
                     record_slot_done("afternoon_post", today_date, media_url)
                     last_post_info = f"Afternoon Post published at {now_ist.strftime('%I:%M %p')}: {media_url}"
                     print(f"[✓] Afternoon Post recorded in daily log: {media_url}")
+                    try:
+                        from services.notification_service import send_push_notification
+                        send_push_notification("☀️ Afternoon Post Published!", f"Afternoon Post is live on Instagram: {media_url}", media_url)
+                    except Exception:
+                        pass
 
             # 3. Slot 3: Evening Prime-Time Reel (Active window: 07:00 PM - 11:59 PM IST)
             elif 19 <= hour <= 23 and not is_slot_done_today("evening_reel", today_date):
@@ -128,6 +138,11 @@ def bg_scheduler_loop():
                     record_slot_done("evening_reel", today_date, media_url)
                     last_post_info = f"Evening Reel published at {now_ist.strftime('%I:%M %p')}: {media_url}"
                     print(f"[✓] Evening Reel recorded in daily log: {media_url}")
+                    try:
+                        from services.notification_service import send_push_notification
+                        send_push_notification("🌙 Evening Reel Published!", f"Prime-time Reel is live on Instagram: {media_url}", media_url)
+                    except Exception:
+                        pass
 
             # Process custom scheduled posts queue
             if post_service and pipeline:
@@ -237,16 +252,26 @@ def get_stats():
 
 @app.get("/trigger/reel")
 @app.post("/trigger/reel")
-def trigger_reel(background_tasks: BackgroundTasks, hook: str = None, quote: str = None):
+def trigger_reel(background_tasks: BackgroundTasks, hook: str = None, quote: str = None, use_voiceover: bool = False):
     """Trigger an instant 12s Reel creation and upload."""
     if not pipeline:
         return {"error": "Pipeline not initialized"}
     
     def task():
-        pipeline.create_and_post_reel(hook=hook, quote=quote, duration_sec=12, use_voiceover=False)
+        try:
+            res = pipeline.create_and_post_reel(hook=hook, quote=quote, duration_sec=12, use_voiceover=use_voiceover)
+            media_url = res.get("url", "")
+            from services.notification_service import send_push_notification
+            send_push_notification(
+                title="🎬 Reel Uploaded to @stanger.man69!",
+                message=f"Your new Reel is live on Instagram: {media_url}",
+                url=media_url
+            )
+        except Exception as e:
+            print(f"[!] trigger_reel task error: {e}")
 
     background_tasks.add_task(task)
-    return {"status": "success", "message": "Reel generation and upload started in background."}
+    return {"status": "success", "message": f"Reel generation and upload started in background (Voiceover: {'ON' if use_voiceover else 'BGM only'})."}
 
 @app.get("/trigger/post")
 @app.post("/trigger/post")
@@ -256,7 +281,17 @@ def trigger_post(background_tasks: BackgroundTasks, quote: str = None, category:
         return {"error": "Pipeline not initialized"}
     
     def task():
-        pipeline.create_and_post_image(quote=quote, category=category)
+        try:
+            res = pipeline.create_and_post_image(quote=quote, category=category)
+            media_url = res.get("url", "")
+            from services.notification_service import send_push_notification
+            send_push_notification(
+                title="📸 Post Uploaded to @stanger.man69!",
+                message=f"Your new Image Post is live on Instagram: {media_url}",
+                url=media_url
+            )
+        except Exception as e:
+            print(f"[!] trigger_post task error: {e}")
 
     background_tasks.add_task(task)
     return {"status": "success", "message": "Image Post generation and upload started in background."}
@@ -319,6 +354,7 @@ async def api_schedule_post(request: Request):
         hook = data.get("hook")
         quote = data.get("quote")
         caption = data.get("caption")
+        use_voiceover = bool(data.get("use_voiceover", False))
 
         if not raw_time:
             return {"status": "error", "message": "Scheduled time is required (e.g. 2026-11-02 18:30)."}
@@ -341,7 +377,8 @@ async def api_schedule_post(request: Request):
             scheduled_time=clean_time,
             hook=hook,
             quote=quote,
-            caption=caption
+            caption=caption,
+            use_voiceover=use_voiceover
         )
 
         return {
@@ -360,6 +397,30 @@ def api_schedule_delete(post_id: int):
         if success:
             return {"status": "success", "message": f"Scheduled item #{post_id} cancelled."}
         return {"status": "error", "message": f"Item #{post_id} not found or already published."}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.get("/api/notifications/recent")
+def api_notifications_recent():
+    """Returns recent push notifications history."""
+    try:
+        from database.db import get_recent_notifications
+        items = get_recent_notifications(limit=15)
+        return {"status": "success", "items": items}
+    except Exception as e:
+        return {"status": "error", "message": str(e), "items": []}
+
+@app.post("/api/notifications/test")
+def api_notifications_test():
+    """Dispatches an immediate test push notification to phone."""
+    try:
+        from services.notification_service import send_push_notification
+        res = send_push_notification(
+            title="🔔 Instagram Agent Test Alert",
+            message="Push alerts are active! You will be notified instantly whenever a new Reel or Post is published.",
+            url="https://instagram.com/stanger.man69"
+        )
+        return {"status": "success", "message": "Test push notification dispatched!", "details": res}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 

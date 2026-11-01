@@ -48,6 +48,10 @@ def init_db():
             cursor.execute("ALTER TABLE scheduled_posts ADD COLUMN quote TEXT")
         except Exception:
             pass
+        try:
+            cursor.execute("ALTER TABLE scheduled_posts ADD COLUMN use_voiceover INTEGER DEFAULT 0")
+        except Exception:
+            pass
 
         # Comment & DM Keyword Rules
         cursor.execute("""
@@ -113,6 +117,17 @@ def init_db():
                 PRIMARY KEY (date, slot)
             )
         """)
+
+        # Real-Time Push Notifications History
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS notifications_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                message TEXT NOT NULL,
+                url TEXT DEFAULT '',
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
         
         # Insert default keyword rules if empty
         cursor.execute("SELECT COUNT(*) as count FROM keyword_rules")
@@ -140,15 +155,16 @@ def add_scheduled_item(
     hook: Optional[str] = None,
     quote: Optional[str] = None,
     caption: Optional[str] = None,
-    media_path: str = ""
+    media_path: str = "",
+    use_voiceover: bool = False
 ) -> int:
     """Schedule a post or reel for future publishing (scheduled_time in 'YYYY-MM-DD HH:MM:SS' format)."""
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO scheduled_posts (media_path, media_type, caption, scheduled_time, status, hook, quote)
-            VALUES (?, ?, ?, ?, 'pending', ?, ?)
-        """, (media_path, media_type.lower(), caption or "", scheduled_time, hook, quote))
+            INSERT INTO scheduled_posts (media_path, media_type, caption, scheduled_time, status, hook, quote, use_voiceover)
+            VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)
+        """, (media_path, media_type.lower(), caption or "", scheduled_time, hook, quote, 1 if use_voiceover else 0))
         conn.commit()
         return cursor.lastrowid
 
@@ -437,3 +453,28 @@ def get_today_slots_status(date_str: str) -> Dict[str, bool]:
         "afternoon_post": is_slot_done_today("afternoon_post", date_str),
         "evening_reel": is_slot_done_today("evening_reel", date_str)
     }
+
+
+# --- Push Notification Helpers ---
+def record_notification(title: str, message: str, url: str = "") -> int:
+    """Stores push notification in database history."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO notifications_history (title, message, url)
+            VALUES (?, ?, ?)
+        """, (title, message, url))
+        conn.commit()
+        return cursor.lastrowid
+
+
+def get_recent_notifications(limit: int = 15) -> List[Dict[str, Any]]:
+    """Retrieves recent push notifications sent."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT * FROM notifications_history
+            ORDER BY created_at DESC, id DESC
+            LIMIT ?
+        """, (limit,))
+        return [dict(row) for row in cursor.fetchall()]

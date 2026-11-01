@@ -45,6 +45,14 @@ data class GeneratedShayariData(
     val category: String
 )
 
+data class NotificationItemData(
+    val id: Int,
+    val title: String,
+    val message: String,
+    val url: String = "",
+    val createdAt: String = ""
+)
+
 class InstagramApiClient(private val baseUrl: String = "https://instagram-agent-x9pn.onrender.com") {
 
     suspend fun generateShayari(topic: String = "sukoon"): Result<GeneratedShayariData> = withContext(Dispatchers.IO) {
@@ -114,11 +122,12 @@ class InstagramApiClient(private val baseUrl: String = "https://instagram-agent-
         }
     }
 
-    suspend fun triggerReel(hook: String? = null, quote: String? = null): Result<String> = withContext(Dispatchers.IO) {
+    suspend fun triggerReel(hook: String? = null, quote: String? = null, useVoiceover: Boolean = false): Result<String> = withContext(Dispatchers.IO) {
         try {
             val params = mutableListOf<String>()
             if (!hook.isNullOrBlank()) params.add("hook=${URLEncoder.encode(hook, "UTF-8")}")
             if (!quote.isNullOrBlank()) params.add("quote=${URLEncoder.encode(quote, "UTF-8")}")
+            params.add("use_voiceover=$useVoiceover")
             val query = if (params.isNotEmpty()) "?" + params.joinToString("&") else ""
             val json = postRequest("$baseUrl/trigger/reel$query", "")
             val obj = JSONObject(json)
@@ -171,7 +180,8 @@ class InstagramApiClient(private val baseUrl: String = "https://instagram-agent-
         mediaType: String,
         scheduledTime: String,
         hook: String? = null,
-        quote: String? = null
+        quote: String? = null,
+        useVoiceover: Boolean = false
     ): Result<String> = withContext(Dispatchers.IO) {
         try {
             val body = JSONObject().apply {
@@ -179,6 +189,7 @@ class InstagramApiClient(private val baseUrl: String = "https://instagram-agent-
                 put("scheduled_time", scheduledTime)
                 if (!hook.isNullOrBlank()) put("hook", hook)
                 if (!quote.isNullOrBlank()) put("quote", quote)
+                put("use_voiceover", useVoiceover)
             }
             val json = postJsonRequest("$baseUrl/api/schedule", body.toString())
             val obj = JSONObject(json)
@@ -187,6 +198,40 @@ class InstagramApiClient(private val baseUrl: String = "https://instagram-agent-
             } else {
                 Result.failure(Exception(obj.optString("message", "Scheduling failed")))
             }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun testNotification(): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            val json = postRequest("$baseUrl/api/notifications/test", "")
+            val obj = JSONObject(json)
+            Result.success(obj.optString("message", "Notification dispatched!"))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getRecentNotifications(): Result<List<NotificationItemData>> = withContext(Dispatchers.IO) {
+        try {
+            val json = getRequest("$baseUrl/api/notifications/recent")
+            val obj = JSONObject(json)
+            val arr = obj.optJSONArray("items") ?: JSONArray()
+            val list = mutableListOf<NotificationItemData>()
+            for (i in 0 until arr.length()) {
+                val item = arr.getJSONObject(i)
+                list.add(
+                    NotificationItemData(
+                        id = item.optInt("id", 0),
+                        title = item.optString("title", ""),
+                        message = item.optString("message", ""),
+                        url = item.optString("url", ""),
+                        createdAt = item.optString("created_at", "")
+                    )
+                )
+            }
+            Result.success(list)
         } catch (e: Exception) {
             Result.failure(e)
         }

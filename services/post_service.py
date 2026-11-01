@@ -56,12 +56,13 @@ class PostService:
                 elif pipeline:
                     # Dynamically generate and post
                     if m_type == "reel":
+                        voiceover_flag = bool(item.get("use_voiceover", 0))
                         res = pipeline.create_and_post_reel(
                             hook=item.get("hook") or None,
                             quote=item.get("quote") or None,
                             caption=item.get("caption") or None,
                             duration_sec=12,
-                            use_voiceover=False
+                            use_voiceover=voiceover_flag
                         )
                     else:
                         res = pipeline.create_and_post_image(
@@ -74,7 +75,17 @@ class PostService:
 
                 media_id = res.get("media_id", res.get("url", "live"))
                 mark_post_published(item["id"], media_id)
-                print(f"[✓] Scheduled post #{item['id']} published successfully! URL: {res.get('url')}")
+                post_url = res.get("url", "")
+                print(f"[✓] Scheduled post #{item['id']} published successfully! URL: {post_url}")
+                try:
+                    from services.notification_service import send_push_notification
+                    send_push_notification(
+                        title=f"⏰ Scheduled {m_type.upper()} Published!",
+                        message=f"Post #{item['id']} is now live on Instagram: {post_url}",
+                        url=post_url
+                    )
+                except Exception as notif_err:
+                    print(f"[!] Push notification error: {notif_err}")
                 count += 1
             except Exception as e:
                 print(f"[!] Failed to publish scheduled post #{item['id']}: {e}")

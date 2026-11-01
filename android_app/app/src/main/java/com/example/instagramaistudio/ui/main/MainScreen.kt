@@ -204,6 +204,8 @@ fun NativeStudioView(
     state: InstagramStudioUiState,
     viewModel: MainScreenViewModel
 ) {
+    val context = LocalContext.current
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -257,6 +259,14 @@ fun NativeStudioView(
             )
         }
 
+        // 2c. Real-Time Phone Push Notifications Card
+        item {
+            NotificationCard(
+                isLoading = state.isActionLoading,
+                onTestAlert = { viewModel.testPushNotification(context) }
+            )
+        }
+
         // 3. Instant 1-Click Publishing Hub
         item {
             Card(
@@ -270,6 +280,37 @@ fun NativeStudioView(
                     Text("Instant 1-Click Publishing Hub", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     Text("Trigger immediate AI generation and publish directly to Instagram", color = TextMuted, fontSize = 11.sp)
 
+                    // Audio Mode Switch: BGM vs AI Voiceover + BGM
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { viewModel.setVoiceover(!state.useVoiceover) }
+                            .background(CardBgLight)
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                if (state.useVoiceover) "🎙️ AI Voiceover + BGM" else "🎵 Pure BGM (Aesthetic Lofi)",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        Switch(
+                            checked = state.useVoiceover,
+                            onCheckedChange = { viewModel.setVoiceover(it) },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = PurpleAccent,
+                                uncheckedThumbColor = TextMuted,
+                                uncheckedTrackColor = InputBg
+                            )
+                        )
+                    }
+
                     Button(
                         onClick = { viewModel.triggerReelNow() },
                         enabled = !state.isActionLoading,
@@ -279,7 +320,11 @@ fun NativeStudioView(
                             .fillMaxWidth()
                             .height(46.dp)
                     ) {
-                        Text("🎬 Create & Post 12s Reel NOW", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text(
+                            if (state.useVoiceover) "🎬 Post 12s Reel with Voiceover NOW" else "🎬 Create & Post 12s Reel NOW",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
                     }
 
                     Button(
@@ -310,6 +355,8 @@ fun NativeStudioView(
         item {
             ScheduleContentCard(
                 isLoading = state.isActionLoading,
+                useVoiceover = state.useVoiceover,
+                onVoiceoverChange = { viewModel.setVoiceover(it) },
                 onSchedule = { type, time, hook, quote -> viewModel.scheduleItem(type, time, hook, quote) }
             )
         }
@@ -412,6 +459,49 @@ fun GrowthBotCard(isLoading: Boolean, onScanNow: () -> Unit) {
 }
 
 @Composable
+fun NotificationCard(isLoading: Boolean, onTestAlert: () -> Unit) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = CardBg),
+        shape = RoundedCornerShape(18.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, CardBorder, RoundedCornerShape(18.dp))
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("🔔 Phone Push Alerts", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(EmeraldBg).padding(horizontal = 6.dp, vertical = 2.dp)) {
+                        Text("Active", color = EmeraldGreen, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+                Text("Status Bar Tray", color = TextMuted, fontSize = 11.sp)
+            }
+            Text(
+                "Instant push alerts on every new Reel / Post upload • Topic: stanger_man69_alerts",
+                color = TextMuted,
+                fontSize = 11.sp
+            )
+            Button(
+                onClick = onTestAlert,
+                enabled = !isLoading,
+                colors = ButtonDefaults.buttonColors(containerColor = CardBgLight),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(36.dp)
+            ) {
+                Text("📲 Test Phone Notification NOW", color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+}
+
+@Composable
 fun CustomShayariCard(
     isLoading: Boolean,
     onGenerate: (topic: String, onResult: (hook: String, quote: String) -> Unit) -> Unit,
@@ -507,6 +597,8 @@ fun CustomShayariCard(
 @Composable
 fun ScheduleContentCard(
     isLoading: Boolean,
+    useVoiceover: Boolean,
+    onVoiceoverChange: (Boolean) -> Unit,
     onSchedule: (type: String, time: String, hook: String?, quote: String?) -> Unit
 ) {
     var mediaType by remember { mutableStateOf("reel") }
@@ -548,6 +640,37 @@ fun ScheduleContentCard(
                     ),
                     modifier = Modifier.weight(1f)
                 )
+            }
+
+            // Audio Option for Reel
+            if (mediaType == "reel") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { onVoiceoverChange(!useVoiceover) }
+                        .background(CardBgLight)
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        if (useVoiceover) "🎙️ Soulful AI Voiceover + BGM" else "🎵 Pure BGM (Aesthetic Lofi)",
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Switch(
+                        checked = useVoiceover,
+                        onCheckedChange = onVoiceoverChange,
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = PurpleAccent,
+                            uncheckedThumbColor = TextMuted,
+                            uncheckedTrackColor = InputBg
+                        )
+                    )
+                }
             }
 
             // Quick Presets with Horizontal Scroll

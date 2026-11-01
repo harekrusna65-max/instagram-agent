@@ -141,21 +141,39 @@
                 <span class="px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">Active</span>
             </div>
 
-            <div class="glass-card rounded-2xl p-4 flex items-center justify-between border-l-4 border-l-amber-500 md:col-span-2">
+            <div class="glass-card rounded-2xl p-4 flex items-center justify-between border-l-4 border-l-amber-500">
                 <div class="flex items-center gap-3">
                     <div class="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
                         <i data-lucide="message-square" class="w-5 h-5"></i>
                     </div>
                     <div>
                         <h4 class="text-xs font-bold text-white flex items-center gap-1.5">
-                            Viral Comment-to-DM Bot Active
+                            Viral Comment-to-DM Bot
                             <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
                         </h4>
-                        <p class="text-[11px] text-slate-400">Triggers on keywords 'SUKOON', 'SHAYARI', 'LINK' &bull; Auto-Likes comment &amp; sends instant DM</p>
+                        <p class="text-[11px] text-slate-400">Triggers: 'SUKOON', 'SHAYARI', 'LINK' &bull; Auto-Likes &amp; DMs</p>
                     </div>
                 </div>
                 <button type="button" onclick="triggerGrowthScan()" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition flex items-center gap-1">
                     <i data-lucide="scan" class="w-3.5 h-3.5"></i> Scan Now
+                </button>
+            </div>
+
+            <div class="glass-card rounded-2xl p-4 flex items-center justify-between border-l-4 border-l-cyan-500">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center">
+                        <i data-lucide="bell-ring" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h4 class="text-xs font-bold text-white flex items-center gap-1.5">
+                            Phone Push Notifications
+                            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        </h4>
+                        <p class="text-[11px] text-slate-400">Alerts phone on every new Reel / Post upload &bull; Topic: stanger_man69_alerts</p>
+                    </div>
+                </div>
+                <button type="button" onclick="triggerTestNotification()" id="btn-test-notif" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 transition flex items-center gap-1">
+                    <i data-lucide="send" class="w-3.5 h-3.5"></i> Test Alert
                 </button>
             </div>
         </div>
@@ -206,6 +224,21 @@
                                 </div>
                             </div>
                         </label>
+                    </div>
+
+                    <!-- Audio Mode Toggle for Reel -->
+                    <div id="sch-audio-box" class="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/5">
+                        <div class="flex items-center gap-2.5">
+                            <i data-lucide="mic" class="w-4 h-4 text-purple-400"></i>
+                            <div>
+                                <p class="text-xs font-semibold text-white">Reel Audio Experience</p>
+                                <p class="text-[10px] text-slate-400">Atmospheric BGM or Soulful Urdu/Hindi AI Voiceover</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1.5 bg-black/40 p-1 rounded-xl border border-white/5">
+                            <button type="button" id="btn-audio-bgm" onclick="setScheduleAudioMode(false)" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-600 text-white transition">🎵 BGM Only</button>
+                            <button type="button" id="btn-audio-voice" onclick="setScheduleAudioMode(true)" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-white/5 text-slate-400 hover:text-white transition">🎙️ Voiceover + BGM</button>
+                        </div>
                     </div>
 
                     <!-- Date & Time Input with Presets -->
@@ -310,7 +343,17 @@
                             <i data-lucide="music" class="w-4 h-4 text-slate-400"></i>
                         </div>
                         <h3 class="font-bold text-white text-base mb-1">Aesthetic Video Reel</h3>
-                        <p class="text-xs text-slate-400 mb-4">Picks unused shayari from vault, renders 1080x1920 video with particles & 432Hz lofi music.</p>
+                        <p class="text-xs text-slate-400 mb-3">Picks unused shayari from vault, renders 1080x1920 video with particles & 432Hz lofi music.</p>
+                        
+                        <div class="flex items-center justify-between mb-4 px-3 py-2 rounded-xl bg-black/40 border border-white/5">
+                            <span class="text-xs text-slate-300 flex items-center gap-1.5 font-medium">
+                                <i data-lucide="mic" class="w-3.5 h-3.5 text-purple-400"></i> Soulful AI Voiceover
+                            </span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="toggle-instant-voiceover" class="sr-only peer">
+                                <div class="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                            </label>
+                        </div>
                     </div>
                     <button id="btn-trigger-reel" onclick="triggerReel()" class="w-full py-3 rounded-xl btn-gradient text-sm font-semibold text-white flex items-center justify-center gap-2 shadow-lg">
                         <i data-lucide="play" class="w-4 h-4 fill-current"></i>
@@ -449,8 +492,33 @@
         lucide.createIcons();
 
         let scheduleMode = 'auto';
+        let scheduleVoiceover = false;
 
-        function toggleScheduleType() {}
+        function toggleScheduleType() {
+            const typeRadio = document.querySelector('input[name="sch-type"]:checked');
+            const mediaType = typeRadio ? typeRadio.value : 'reel';
+            const audioBox = document.getElementById("sch-audio-box");
+            if (audioBox) {
+                if (mediaType === 'post') {
+                    audioBox.classList.add("hidden");
+                } else {
+                    audioBox.classList.remove("hidden");
+                }
+            }
+        }
+
+        function setScheduleAudioMode(isVoice) {
+            scheduleVoiceover = isVoice;
+            const btnBgm = document.getElementById("btn-audio-bgm");
+            const btnVoice = document.getElementById("btn-audio-voice");
+            if (isVoice) {
+                btnVoice.className = "px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-600 text-white transition";
+                btnBgm.className = "px-2.5 py-1 rounded-lg text-xs font-bold bg-white/5 text-slate-400 hover:text-white transition";
+            } else {
+                btnBgm.className = "px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-600 text-white transition";
+                btnVoice.className = "px-2.5 py-1 rounded-lg text-xs font-bold bg-white/5 text-slate-400 hover:text-white transition";
+            }
+        }
 
         function setScheduleMode(mode) {
             scheduleMode = mode;
@@ -538,7 +606,8 @@
                         media_type: mediaType,
                         scheduled_time: scheduledTime,
                         hook: hook,
-                        quote: quote
+                        quote: quote,
+                        use_voiceover: (mediaType === 'reel' && scheduleVoiceover)
                     })
                 });
                 const data = await res.json();
@@ -648,10 +717,12 @@
             btn.disabled = true;
             btn.innerHTML = `<span class="animate-spin mr-2">⏳</span> Rendering & Uploading... (~25s)`;
             
+            const isVoiceover = document.getElementById("toggle-instant-voiceover")?.checked || false;
+
             try {
-                const res = await fetch("/trigger/reel", { method: "POST" });
+                const res = await fetch(`/trigger/reel?use_voiceover=${isVoiceover}`, { method: "POST" });
                 const data = await res.json();
-                showStatus("🎉 Reel generation started! It will be live on Instagram in ~25 seconds.");
+                showStatus(`🎉 Reel generation started (${isVoiceover ? 'Voiceover + BGM' : 'BGM Only'})! It will be live on Instagram in ~25s.`);
                 setTimeout(refreshLiveStats, 12000);
                 setTimeout(refreshLiveStats, 25000);
                 setTimeout(refreshLiveStats, 40000);
@@ -661,6 +732,23 @@
                 btn.disabled = false;
                 btn.innerHTML = `<i data-lucide="play" class="w-4 h-4 fill-current"></i><span>Create & Post Reel NOW</span>`;
                 lucide.createIcons();
+            }
+        }
+
+        async function triggerTestNotification() {
+            const btn = document.getElementById("btn-test-notif");
+            if (btn) btn.innerHTML = `<span class="animate-spin mr-1">⏳</span> Sending...`;
+            try {
+                const res = await fetch("/api/notifications/test", { method: "POST" });
+                const data = await res.json();
+                showStatus("🔔 " + (data.message || "Test push notification dispatched!"));
+            } catch (e) {
+                showStatus("Notification error: " + e.message, true);
+            } finally {
+                if (btn) {
+                    btn.innerHTML = `<i data-lucide="send" class="w-3.5 h-3.5"></i> Test Alert`;
+                    lucide.createIcons();
+                }
             }
         }
 

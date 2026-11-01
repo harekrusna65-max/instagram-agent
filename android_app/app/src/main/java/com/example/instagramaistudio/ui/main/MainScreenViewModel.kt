@@ -1,11 +1,13 @@
 package com.example.instagramaistudio.ui.main
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.instagramaistudio.data.InstagramApiClient
 import com.example.instagramaistudio.data.ProfileStatsData
 import com.example.instagramaistudio.data.ScheduledItemData
 import com.example.instagramaistudio.data.ServerStatusData
+import com.example.instagramaistudio.util.NotificationHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,7 +22,8 @@ data class InstagramStudioUiState(
     val isActionLoading: Boolean = false,
     val actionMessage: String? = null,
     val isError: Boolean = false,
-    val selectedTab: Int = 0 // 0 = Native Studio, 1 = Web Cloud Dashboard
+    val selectedTab: Int = 0, // 0 = Native Studio, 1 = Web Cloud Dashboard
+    val useVoiceover: Boolean = false
 )
 
 class MainScreenViewModel(
@@ -56,10 +59,15 @@ class MainScreenViewModel(
         }
     }
 
+    fun setVoiceover(enabled: Boolean) {
+        _uiState.update { it.copy(useVoiceover = enabled) }
+    }
+
     fun triggerReelNow() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isActionLoading = true, actionMessage = "Rendering & uploading 12s Reel to Instagram...") }
-            val res = client.triggerReel()
+            val isVoice = _uiState.value.useVoiceover
+            _uiState.update { it.copy(isActionLoading = true, actionMessage = "Rendering & uploading 12s Reel (${if (isVoice) "Voiceover + BGM" else "BGM Only"})...") }
+            val res = client.triggerReel(useVoiceover = isVoice)
             res.onSuccess { msg ->
                 _uiState.update { it.copy(isActionLoading = false, actionMessage = "🎉 Reel triggered! Live in ~25s.", isError = false) }
                 refreshAll()
@@ -101,8 +109,9 @@ class MainScreenViewModel(
             return
         }
         viewModelScope.launch {
+            val isVoice = _uiState.value.useVoiceover
             _uiState.update { it.copy(isActionLoading = true, actionMessage = "Publishing custom ${if (isReel) "Reel" else "Post"}...") }
-            val res = if (isReel) client.triggerReel(hook, quote) else client.triggerPost(quote)
+            val res = if (isReel) client.triggerReel(hook, quote, useVoiceover = isVoice) else client.triggerPost(quote)
             res.onSuccess {
                 _uiState.update { it.copy(isActionLoading = false, actionMessage = "🎉 Custom content sent to Instagram!", isError = false) }
                 refreshAll()
@@ -118,8 +127,9 @@ class MainScreenViewModel(
             return
         }
         viewModelScope.launch {
+            val isVoice = _uiState.value.useVoiceover
             _uiState.update { it.copy(isActionLoading = true, actionMessage = "Scheduling $mediaType...") }
-            val res = client.schedulePost(mediaType, scheduledTime, hook, quote)
+            val res = client.schedulePost(mediaType, scheduledTime, hook, quote, useVoiceover = if (mediaType == "reel") isVoice else false)
             res.onSuccess { msg ->
                 _uiState.update { it.copy(isActionLoading = false, actionMessage = "🎉 $msg", isError = false) }
                 refreshAll()
@@ -150,6 +160,22 @@ class MainScreenViewModel(
             }.onFailure { err ->
                 _uiState.update { it.copy(actionMessage = "Scan Error: ${err.message}", isError = true) }
             }
+        }
+    }
+
+    fun testPushNotification(context: Context) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(actionMessage = "🔔 Testing push notification...", isError = false) }
+            // Trigger server push
+            client.testNotification()
+            // Also trigger local rich heads-up notification immediately on phone
+            NotificationHelper.showNotification(
+                context = context,
+                title = "🔔 Instagram AI Studio Alert",
+                message = "Push alerts are active! You will be notified instantly whenever a new Reel or Post is uploaded.",
+                targetUrl = "https://instagram.com/stanger.man69"
+            )
+            _uiState.update { it.copy(actionMessage = "🔔 Push alert sent to your phone notification tray!", isError = false) }
         }
     }
 
