@@ -249,6 +249,14 @@ fun NativeStudioView(
             }
         }
 
+        // 2b. Viral Growth & Comment-to-DM Bot
+        item {
+            GrowthBotCard(
+                isLoading = state.isActionLoading,
+                onScanNow = { viewModel.triggerGrowthScan() }
+            )
+        }
+
         // 3. Instant 1-Click Publishing Hub
         item {
             Card(
@@ -356,6 +364,49 @@ fun SlotBadge(name: String, isDone: Boolean) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(name.split(" ")[0], color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
             Text(icon, color = fg, fontSize = 10.sp)
+        }
+    }
+}
+
+@Composable
+fun GrowthBotCard(isLoading: Boolean, onScanNow: () -> Unit) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = CardBg),
+        shape = RoundedCornerShape(18.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, CardBorder, RoundedCornerShape(18.dp))
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("🚀 Viral Growth Bot", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(AmberBg).padding(horizontal = 6.dp, vertical = 2.dp)) {
+                        Text("Active", color = AmberPending, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+                Text("Comment-to-DM", color = TextMuted, fontSize = 11.sp)
+            }
+            Text(
+                "Auto-likes comments & sends instant DMs for keywords: SUKOON, SHAYARI, LINK",
+                color = TextMuted,
+                fontSize = 11.sp
+            )
+            Button(
+                onClick = onScanNow,
+                enabled = !isLoading,
+                colors = ButtonDefaults.buttonColors(containerColor = CardBgLight),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(36.dp)
+            ) {
+                Text("🔍 Scan Comments & DMs NOW", color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+            }
         }
     }
 }

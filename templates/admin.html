@@ -140,6 +140,24 @@
                 </div>
                 <span class="px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">Active</span>
             </div>
+
+            <div class="glass-card rounded-2xl p-4 flex items-center justify-between border-l-4 border-l-amber-500 md:col-span-2">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
+                        <i data-lucide="message-square" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h4 class="text-xs font-bold text-white flex items-center gap-1.5">
+                            Viral Comment-to-DM Bot Active
+                            <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                        </h4>
+                        <p class="text-[11px] text-slate-400">Triggers on keywords 'SUKOON', 'SHAYARI', 'LINK' &bull; Auto-Likes comment &amp; sends instant DM</p>
+                    </div>
+                </div>
+                <button type="button" onclick="triggerGrowthScan()" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition flex items-center gap-1">
+                    <i data-lucide="scan" class="w-3.5 h-3.5"></i> Scan Now
+                </button>
+            </div>
         </div>
 
         <!-- Schedule Content Hub & Queue -->
@@ -664,6 +682,17 @@
                 btn.disabled = false;
                 btn.innerHTML = `<i data-lucide="upload" class="w-4 h-4"></i><span>Create & Post Image NOW</span>`;
                 lucide.createIcons();
+            }
+        }
+
+        async function triggerGrowthScan() {
+            showStatus("🚀 Growth Bot: Scanning recent comments and unread DMs...");
+            try {
+                const res = await fetch("/api/growth/scan_now", { method: "POST" });
+                const data = await res.json();
+                showStatus(data.message || "Scan complete!");
+            } catch (e) {
+                showStatus("Scan error: " + e.message, true);
             }
         }
 

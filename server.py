@@ -35,7 +35,8 @@ from database.db import (
     get_today_slots_status,
     add_scheduled_item,
     get_all_scheduled_posts,
-    delete_scheduled_post
+    delete_scheduled_post,
+    get_active_rules
 )
 from core.client import InstagramAgentClient
 from services.auto_content_pipeline import AutoContentPipeline
@@ -269,6 +270,32 @@ def api_generate_shayari(topic: str = "sukoon"):
         ai_generator = AIGenerator()
     data = ai_generator.generate_ai_shayari(topic=topic)
     return {"status": "success", **data}
+
+@app.get("/api/growth/rules")
+def api_growth_rules():
+    """Returns active comment-to-DM triggers."""
+    try:
+        rules = get_active_rules()
+        return {"status": "success", "rules": rules}
+    except Exception as e:
+        return {"status": "error", "message": str(e), "rules": []}
+
+@app.post("/api/growth/scan_now")
+def api_growth_scan(background_tasks: BackgroundTasks):
+    """Triggers an immediate scan of recent post comments and unread DMs."""
+    if not engagement:
+        return {"status": "error", "message": "Engagement service not ready."}
+    
+    def task():
+        try:
+            c = engagement.process_recent_post_comments(post_limit=5)
+            d = engagement.process_unread_dms()
+            print(f"[✓ GROWTH BOT] Processed {c} comments, {d} DMs.")
+        except Exception as e:
+            print(f"[!] Growth bot scan error: {e}")
+
+    background_tasks.add_task(task)
+    return {"status": "success", "message": "Growth Bot is scanning comments & DMs in background!"}
 
 @app.get("/api/schedule/list")
 def api_schedule_list():

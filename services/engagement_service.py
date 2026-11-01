@@ -51,7 +51,14 @@ class EngagementService:
                         if kw in comment_text_lower:
                             print(f"[+] Keyword match '{kw}' by @{username} on post {media.code}")
                             
-                            # 1. Reply to comment if configured
+                            # 1. Like the comment
+                            try:
+                                self.client.client.comment_like(comment.pk)
+                                print(f"    [✓] Liked comment #{comment_id}")
+                            except Exception:
+                                pass
+
+                            # 2. Reply to comment if configured
                             if rule["reply_comment"]:
                                 reply_text = rule["reply_comment"].replace("@user", f"@{username}")
                                 try:
@@ -60,7 +67,7 @@ class EngagementService:
                                 except Exception as e:
                                     print(f"    [!] Failed to reply to comment: {e}")
 
-                            # 2. Send DM if configured
+                            # 3. Send DM if configured
                             if rule["reply_dm"]:
                                 dm_text = rule["reply_dm"].replace("{name}", comment.user.full_name or username)
                                 try:

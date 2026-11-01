@@ -121,9 +121,10 @@ def init_db():
                 INSERT INTO keyword_rules (keyword, reply_comment, reply_dm)
                 VALUES (?, ?, ?)
             """, [
-                ("link", "Sent you the details in DM! Check your inbox 🚀", "Hey there! Thanks for your interest. Here is the link you requested: https://example.com/info"),
-                ("price", "Check your DMs! Sent you the full pricing details 📩", "Hello! Here are the details and special pricing. Let me know if you have questions!"),
-                ("info", "DM sent! Please check your message requests 📨", "Hey! Thanks for reaching out. Here is all the info you need.")
+                ("sukoon", "Inbox check kijiye bhai 🖤 Sent you the full poetry in DM!", "Hey {name}! Sukoon shayari ka khajana aapke liye hazir hai: 'Khamoshi me bhi ek mayaar hota hai, sukoon unhe milta hai jo shukr karna jaante hain.' 🖤✨"),
+                ("shayari", "DM sent! Check your message requests 📩", "Shukriya bhai support ke liye! Ye rahi aapki special shayari: 'Apni keemat itni badhao ki log milne ko tarsein.' ⚡🔥"),
+                ("link", "Sent you the details in DM! Check your inbox 🚀", "Hey there! Thanks for your interest. Here is the link you requested: https://instagram.com/stanger.man69"),
+                ("info", "DM sent! Please check your message requests 📨", "Hey {name}! Thanks for reaching out. Here is all the info you need.")
             ])
 
         conn.commit()

@@ -141,6 +141,18 @@ class MainScreenViewModel(
         }
     }
 
+    fun triggerGrowthScan() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(actionMessage = "🚀 Scanning recent comments & DMs...", isError = false) }
+            val res = client.triggerGrowthScan()
+            res.onSuccess { msg ->
+                _uiState.update { it.copy(actionMessage = "🎉 $msg", isError = false) }
+            }.onFailure { err ->
+                _uiState.update { it.copy(actionMessage = "Scan Error: ${err.message}", isError = true) }
+            }
+        }
+    }
+
     fun clearMessage() {
         _uiState.update { it.copy(actionMessage = null) }
     }

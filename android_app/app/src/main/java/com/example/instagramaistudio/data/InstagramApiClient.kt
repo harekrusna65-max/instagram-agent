@@ -63,6 +63,16 @@ class InstagramApiClient(private val baseUrl: String = "https://instagram-agent-
         }
     }
 
+    suspend fun triggerGrowthScan(): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            val json = postRequest("$baseUrl/api/growth/scan_now", "")
+            val obj = JSONObject(json)
+            Result.success(obj.optString("message", "Growth Bot scan started in background!"))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun getStatus(): Result<ServerStatusData> = withContext(Dispatchers.IO) {
         try {
             val json = getRequest("$baseUrl/api/status")
