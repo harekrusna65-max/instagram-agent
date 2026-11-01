@@ -26,16 +26,28 @@ def init_db():
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS scheduled_posts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                media_path TEXT NOT NULL,
+                media_path TEXT NOT NULL DEFAULT '',
                 media_type TEXT NOT NULL DEFAULT 'photo', -- 'photo' or 'reel'
-                caption TEXT NOT NULL,
+                caption TEXT NOT NULL DEFAULT '',
                 scheduled_time TEXT NOT NULL, -- ISO timestamp 'YYYY-MM-DD HH:MM:SS'
                 status TEXT NOT NULL DEFAULT 'pending', -- 'pending', 'published', 'failed'
                 media_id TEXT,
                 error_message TEXT,
+                hook TEXT,
+                quote TEXT,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
         """)
+
+        # Migration: ensure hook and quote columns exist
+        try:
+            cursor.execute("ALTER TABLE scheduled_posts ADD COLUMN hook TEXT")
+        except Exception:
+            pass
+        try:
+            cursor.execute("ALTER TABLE scheduled_posts ADD COLUMN quote TEXT")
+        except Exception:
+            pass
 
         # Comment & DM Keyword Rules
         cursor.execute("""
@@ -121,19 +133,35 @@ def init_db():
 
 
 # --- Scheduled Posts Helpers ---
-def add_scheduled_post(media_path: str, media_type: str, caption: str, scheduled_time: str) -> int:
+def add_scheduled_item(
+    media_type: str,
+    scheduled_time: str,
+    hook: Optional[str] = None,
+    quote: Optional[str] = None,
+    caption: Optional[str] = None,
+    media_path: str = ""
+) -> int:
+    """Schedule a post or reel for future publishing (scheduled_time in 'YYYY-MM-DD HH:MM:SS' format)."""
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO scheduled_posts (media_path, media_type, caption, scheduled_time, status)
-            VALUES (?, ?, ?, ?, 'pending')
-        """, (media_path, media_type, caption, scheduled_time))
+            INSERT INTO scheduled_posts (media_path, media_type, caption, scheduled_time, status, hook, quote)
+            VALUES (?, ?, ?, ?, 'pending', ?, ?)
+        """, (media_path, media_type.lower(), caption or "", scheduled_time, hook, quote))
         conn.commit()
         return cursor.lastrowid
 
 
-def get_pending_scheduled_posts() -> List[Dict[str, Any]]:
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+def add_scheduled_post(media_path: str, media_type: str, caption: str, scheduled_time: str) -> int:
+    return add_scheduled_item(media_type=media_type, scheduled_time=scheduled_time, caption=caption, media_path=media_path)
+
+
+def get_pending_scheduled_posts(now_str: Optional[str] = None) -> List[Dict[str, Any]]:
+    if not now_str:
+        # Default to current IST time
+        from datetime import timezone, timedelta
+        ist_now = datetime.now(timezone(timedelta(hours=5, minutes=30)))
+        now_str = ist_now.strftime("%Y-%m-%d %H:%M:%S")
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
@@ -142,6 +170,29 @@ def get_pending_scheduled_posts() -> List[Dict[str, Any]]:
             ORDER BY scheduled_time ASC
         """, (now_str,))
         return [dict(row) for row in cursor.fetchall()]
+
+
+def get_all_scheduled_posts(limit: int = 20) -> List[Dict[str, Any]]:
+    """Retrieves scheduled posts for the admin queue."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT * FROM scheduled_posts 
+            ORDER BY 
+                CASE status WHEN 'pending' THEN 0 ELSE 1 END,
+                scheduled_time DESC
+            LIMIT ?
+        """, (limit,))
+        return [dict(row) for row in cursor.fetchall()]
+
+
+def delete_scheduled_post(post_id: int) -> bool:
+    """Cancels/deletes a pending scheduled post."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM scheduled_posts WHERE id = ? AND status = 'pending'", (post_id,))
+        conn.commit()
+        return cursor.rowcount > 0
 
 
 def mark_post_published(post_id: int, media_id: str):

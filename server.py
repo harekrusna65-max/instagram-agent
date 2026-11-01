@@ -32,7 +32,10 @@ from database.db import (
     get_unused_quote_count,
     is_slot_done_today,
     record_slot_done,
-    get_today_slots_status
+    get_today_slots_status,
+    add_scheduled_item,
+    get_all_scheduled_posts,
+    delete_scheduled_post
 )
 from core.client import InstagramAgentClient
 from services.auto_content_pipeline import AutoContentPipeline
@@ -124,9 +127,9 @@ def bg_scheduler_loop():
                     last_post_info = f"Evening Reel published at {now_ist.strftime('%I:%M %p')}: {media_url}"
                     print(f"[✓] Evening Reel recorded in daily log: {media_url}")
 
-            # Community engagement processing every 15 mins
-            if post_service:
-                post_service.process_pending_scheduled()
+            # Process custom scheduled posts queue
+            if post_service and pipeline:
+                post_service.process_pending_scheduled(pipeline)
             if engagement and now_ist.minute % 15 == 0 and now_ist.second < 30:
                 engagement.process_recent_post_comments(post_limit=3)
                 engagement.process_unread_dms()
@@ -255,6 +258,72 @@ def trigger_post(background_tasks: BackgroundTasks, quote: str = None, category:
 
     background_tasks.add_task(task)
     return {"status": "success", "message": "Image Post generation and upload started in background."}
+
+@app.get("/api/schedule/list")
+def api_schedule_list():
+    """Returns list of pending and recent scheduled posts."""
+    try:
+        items = get_all_scheduled_posts(limit=20)
+        return {"status": "success", "items": items}
+    except Exception as e:
+        return {"status": "error", "message": str(e), "items": []}
+
+@app.post("/api/schedule")
+async def api_schedule_post(request: Request):
+    """
+    Schedules an auto reel or image post at a specific future IST timestamp.
+    Accepts: { media_type: 'reel'|'post', scheduled_time: 'YYYY-MM-DD HH:MM', hook, quote, caption }
+    """
+    try:
+        data = await request.json()
+        media_type = (data.get("media_type") or "reel").lower().strip()
+        raw_time = (data.get("scheduled_time") or "").strip()
+        hook = data.get("hook")
+        quote = data.get("quote")
+        caption = data.get("caption")
+
+        if not raw_time:
+            return {"status": "error", "message": "Scheduled time is required (e.g. 2026-11-02 18:30)."}
+
+        # Normalize time format: replace 'T' with ' ' and ensure seconds
+        clean_time = raw_time.replace("T", " ").strip()
+        if len(clean_time) == 16:  # 'YYYY-MM-DD HH:MM'
+            clean_time += ":00"
+
+        # Check that scheduled time is valid and in future (IST)
+        now_ist = datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S")
+        if clean_time <= now_ist:
+            return {
+                "status": "error", 
+                "message": f"Scheduled time ({clean_time} IST) must be in the future! Current IST is {now_ist}."
+            }
+
+        post_id = add_scheduled_item(
+            media_type=media_type,
+            scheduled_time=clean_time,
+            hook=hook,
+            quote=quote,
+            caption=caption
+        )
+
+        return {
+            "status": "success",
+            "message": f"Successfully scheduled {media_type.upper()} for {clean_time} IST!",
+            "id": post_id
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.post("/api/schedule/delete/{post_id}")
+def api_schedule_delete(post_id: int):
+    """Cancels/deletes a pending scheduled post."""
+    try:
+        success = delete_scheduled_post(post_id)
+        if success:
+            return {"status": "success", "message": f"Scheduled item #{post_id} cancelled."}
+        return {"status": "error", "message": f"Item #{post_id} not found or already published."}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 if __name__ == "__main__":
     import uvicorn
